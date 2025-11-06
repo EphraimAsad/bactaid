@@ -57,7 +57,7 @@ for field in eng.db.columns:
 if st.sidebar.button("🔄 Reset All Inputs"):
     for k in st.session_state.user_input.keys():
         st.session_state.user_input[k] = "Unknown"
-    st.experimental_rerun()
+    st.rerun()  # Updated for modern Streamlit
 
 # --- IDENTIFY BUTTON ---
 if st.sidebar.button("🔍 Identify"):
@@ -91,14 +91,14 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
     styled_table = st.session_state.results.style.applymap(color_confidence, subset=["Confidence Level"])
     st.dataframe(styled_table, use_container_width=True)
 
-    # Expanders with reasoning
+    # Expanders with reasoning and next steps
     for _, row in st.session_state.results.iterrows():
         header = f"**{row['Genus']}** — {row['Confidence Level']} ({row['Confidence (%)']}%)"
         with st.expander(header):
-            st.markdown(f"**🧠 AI Reasoning:** {row['AI Reasoning']}")
-            st.markdown(f"**🧪 Next Step:** {row['Next Test Suggestion']}")
+            st.markdown(f"**Reasoning:** {row['Reasoning']}")
+            st.markdown(f"**Next Step:** {row['Next Step Suggestion']}")
             if row['Extra Notes']:
-                st.markdown(f"**🧾 Notes:** {row['Extra Notes']}")
+                st.markdown(f"**Notes:** {row['Extra Notes']}")
 
 else:
     st.warning("Enter results and click **Identify** to begin analysis.")
@@ -129,8 +129,8 @@ def export_pdf(df, user_input):
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(0, 8, safe_text(f"{row['Genus']} — {row['Confidence Level']} ({row['Confidence (%)']}%)"), ln=True)
         pdf.set_font("Helvetica", size=10)
-        pdf.multi_cell(0, 8, safe_text(f"Reasoning: {row['AI Reasoning']}"))
-        pdf.multi_cell(0, 8, safe_text(f"Next Step: {row['Next Test Suggestion']}"))
+        pdf.multi_cell(0, 8, safe_text(f"Reasoning: {row['Reasoning']}"))
+        pdf.multi_cell(0, 8, safe_text(f"Next Step: {row['Next Step Suggestion']}"))
         if row['Extra Notes']:
             pdf.multi_cell(0, 8, safe_text(f"Notes: {row['Extra Notes']}"))
         pdf.ln(4)
