@@ -40,16 +40,16 @@ for field in eng.db.columns:
 
     # --- Multi-select fields ---
     for field in fields:
-    if field in ["Colony Morphology", "Media Grown On", "Oxygen Requirement", "Haemolysis Type"]:
-        all_vals = []
-        for v in eng.db[field]:
-            parts = re.split(r"[;/]", str(v))
-            for p in parts:
-                clean = p.strip()
-                if clean and clean not in all_vals:
-                    all_vals.append(clean)
-        all_vals.sort()
-        user_input[field] = st.selectbox(field, ["Unknown"] + all_vals)
+        if field in ["Colony Morphology", "Media Grown On", "Oxygen Requirement", "Haemolysis Type"]:
+            all_vals = []
+            for v in eng.db[field]:
+                parts = re.split(r"[;/]", str(v))
+                for p in parts:
+                    clean = p.strip()
+                    if clean and clean not in all_vals:
+                       all_vals.append(clean)
+           all_vals.sort()
+           user_input[field] = st.selectbox(field, ["Unknown"] + all_vals)
 
     # --- Special fields ---
     elif field == "Growth Temperature":
@@ -97,6 +97,7 @@ if st.sidebar.button("🔍 Identify"):
 # --- Footer ---
 st.markdown("---")
 st.caption("AI Bacteria Identification Assistant | Built by [Zain] 🧫 Powered by Python")
+
 
 
 
