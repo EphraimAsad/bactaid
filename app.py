@@ -2,104 +2,62 @@ import streamlit as st
 import pandas as pd
 import re
 import os
-from engine import BacteriaIdentifier
+from engine import BacteriaIdentifier  # Make sure engine.py is in same folder
 
+# --- Load the database ---
 @st.cache_data
 def load_data():
-    data_path = "bacteria_db.xlsx"
-    st.write("🔍 Current working directory:", os.getcwd())
-    st.write("📁 Files in directory:", os.listdir())
-    st.write("🔎 Looking for:", data_path)
-
-    if not os.path.exists(data_path):
-        st.error(f"❌ File not found: {data_path}")
-        st.stop()
-
-    try:
-        df = pd.read_excel(data_path, engine="openpyxl")
-        st.success("✅ Database loaded successfully!")
-        return df
-    except Exception as e:
-        st.error(f"⚠️ Error reading Excel: {e}")
-        st.stop()
+    data_path = os.path.join("bacteria_db.xlsx")
+    return pd.read_excel(data_path)
 
 db = load_data()
 eng = BacteriaIdentifier(db)
 
-# --- App Header ---
-st.title("🧫 AI Bacteria Identification Assistant")
-st.write("Enter your test results below. The AI will suggest the most likely genera based on your inputs.")
+st.set_page_config(page_title="BactAI-D", layout="wide")
+st.title("🧫 BactAI-D: Bacterial Identification Assistant")
+st.markdown("Enter your biochemical or morphological results below to identify the most likely bacterial genera.")
 
-# --- Sidebar inputs ---
-st.sidebar.header("🧍 Input Your Laboratory Results")
+# --- Input Fields ---
+fields = [
+    "Gram Stain", "Shape", "Catalase", "Oxidase", "Colony Morphology", "Haemolysis",
+    "Haemolysis Type", "Indole", "Growth Temperature", "Media Grown On", "Motility",
+    "Capsule", "Spore Formation", "Oxygen Requirement", "Methyl Red", "VP", "Citrate",
+    "Urease", "H2S", "Lactose Fermentation", "Glucose Fermantation", "Sucrose Fermentation",
+    "Nitrate Reduction", "Lysine Decarboxylase", "Ornitihine Decarboxylase", "Arginine dihydrolase",
+    "Gelatin Hydrolysis", "Esculin Hydrolysis", "Dnase", "ONPG", "NaCl Tolerant (>=6%)"
+]
+
 user_input = {}
 
-for field in eng.db.columns:
-    if field == "Genus":
-        continue
-
-    # --- Multi-select fields ---
-    for field in fields:
-        if field in ["Colony Morphology", "Media Grown On", "Oxygen Requirement", "Haemolysis Type"]:
-            all_vals = []
-            for v in eng.db[field]:
-                parts = re.split(r"[;/]", str(v))
-                for p in parts:
-                    clean = p.strip()
-                    if clean and clean not in all_vals:
-                       all_vals.append(clean)
+for field in fields:
+    # Handle multi-option descriptive fields
+    if field in ["Colony Morphology", "Media Grown On", "Oxygen Requirement", "Haemolysis Type"]:
+        all_vals = []
+        for v in eng.db[field]:
+            parts = re.split(r"[;/]", str(v))
+            for p in parts:
+                clean = p.strip()
+                if clean and clean not in all_vals:
+                    all_vals.append(clean)
         all_vals.sort()
         user_input[field] = st.selectbox(field, ["Unknown"] + all_vals)
 
-    # --- Special fields ---
+    # Numeric input for Growth Temperature
     elif field == "Growth Temperature":
-        user_input[field] = st.sidebar.text_input(
-            field,
-            help="Enter a numeric temperature in °C (e.g., 37)"
-        )
+        user_input[field] = st.text_input("Growth Temperature (e.g., 10//40)", "Unknown")
 
-    elif field == "Extra Notes":
-        user_input[field] = st.sidebar.text_area(
-            field,
-            help="Optional notes for explanation output."
-        )
-
-    # --- Default dropdown ---
+    # Default Positive/Negative/Variable fields
     else:
-        user_input[field] = st.sidebar.selectbox(
-            field,
-            ["", "Positive", "Negative", "Variable"],
-            index=0
-        )
+        user_input[field] = st.selectbox(field, ["Unknown", "Positive", "Negative", "Variable"])
 
-# --- Run identification ---
-if st.sidebar.button("🔍 Identify"):
-    st.subheader("🔬 Identification Results")
-    results = eng.identify(user_input)
+# --- Identification Button ---
+if st.button("🔍 Identify"):
+    with st.spinner("Analyzing test results..."):
+        results = eng.identify(user_input)
+        if results.empty:
+            st.error("No matches found. Try adjusting some results or ensure valid data entry.")
+        else:
+            st.success("Top possible matches:")
+            st.dataframe(results)
 
-    if not results:
-        st.warning("No matches found. Try entering more test results.")
-    else:
-        for i, r in enumerate(results, 1):
-            confidence_pct = round((r.total_score + 10) * 5, 1)
-            confidence_pct = max(0, min(confidence_pct, 100))
-
-            st.markdown(f"### {i}. **{r.genus}**")
-            st.progress(confidence_pct / 100)
-            st.caption(f"Confidence: {confidence_pct}%")
-
-            with st.expander("🧠 Reasoning and Explanation"):
-                st.write(r.reasoning_paragraph())
-
-            if r.extra_notes:
-                st.markdown(f"**Notes:** {r.extra_notes}")
-
-# --- Footer ---
-st.markdown("---")
-st.caption("AI Bacteria Identification Assistant | Built by [Zain] 🧫 Powered by Python")
-
-
-
-
-
-
+st.caption("Built by Zain — powered by Python.")
