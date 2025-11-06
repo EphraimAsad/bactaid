@@ -4,7 +4,7 @@ import re
 import os
 from datetime import datetime
 from fpdf import FPDF
-from engine import BacteriaIdentifier  # Make sure engine.py is in the same folder
+from engine import BacteriaIdentifier  # Make sure engine.py is in same folder
 
 # --- Load database ---
 @st.cache_data
@@ -37,7 +37,7 @@ if "results" not in st.session_state:
 
 # --- Sidebar Fields ---
 for field in fields:
-    if field in ["Colony Morphology", "Media Grown On", "Oxygen Requirement", "Haemolysis Type"]:
+    if field in ["Shape", "Colony Morphology", "Media Grown On", "Oxygen Requirement", "Haemolysis Type"]:
         all_vals = []
         for v in eng.db[field]:
             parts = re.split(r"[;/]", str(v))
@@ -91,7 +91,13 @@ st.write("Compare your biochemical results against a database of 150+ bacterial 
 if identify_clicked:
     with st.spinner("Analyzing results..."):
         results = eng.identify(st.session_state.user_input)
+
+        # Ensure DataFrame format
+        if isinstance(results, list):
+            results = pd.DataFrame(results, columns=["Genus", "Confidence"])
+
         st.session_state.results = results
+
         if results.empty:
             st.error("No matches found. Try adjusting your inputs.")
         else:
@@ -105,8 +111,8 @@ def export_pdf(dataframe, user_input):
     pdf.set_font("Arial", "B", 16)
     pdf.cell(0, 10, "BactAI-D Identification Report", ln=True, align="C")
 
-    pdf.set_font("Arial", size=12)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    pdf.set_font("Arial", size=12)
     pdf.cell(0, 10, f"Generated: {timestamp}", ln=True, align="R")
     pdf.ln(5)
 
@@ -122,7 +128,6 @@ def export_pdf(dataframe, user_input):
     pdf.cell(0, 10, "Top Matches", ln=True)
     pdf.set_font("Arial", size=11)
 
-    # --- Results Section ---
     for i, row in dataframe.iterrows():
         pdf.cell(0, 8, f"{i+1}. {row['Genus']}", ln=True)
         for col in dataframe.columns:
