@@ -13,9 +13,9 @@ def load_data():
 db = load_data()
 eng = BacteriaIdentifier(db)
 
-st.set_page_config(page_title="BactAI-D", layout="wide")
-st.title("🧫 BactAI-D: Bacterial Identification Assistant")
-st.markdown("Enter your biochemical or morphological results below to identify the most likely bacterial genera.")
+st.title("BactAI-D – Bacterial Identification Assistant")
+
+st.write("Enter your test results below. You can leave any field as 'Unknown' if you haven’t done that test yet.")
 
 # --- Input Fields ---
 fields = [
@@ -30,7 +30,7 @@ fields = [
 user_input = {}
 
 for field in fields:
-    # Handle multi-option descriptive fields
+    # Handle fields with multiple descriptive options
     if field in ["Colony Morphology", "Media Grown On", "Oxygen Requirement", "Haemolysis Type"]:
         all_vals = []
         for v in eng.db[field]:
@@ -42,22 +42,22 @@ for field in fields:
         all_vals.sort()
         user_input[field] = st.selectbox(field, ["Unknown"] + all_vals)
 
-    # Numeric input for Growth Temperature
+    # Growth temperature stays a text input
     elif field == "Growth Temperature":
         user_input[field] = st.text_input("Growth Temperature (e.g., 10//40)", "Unknown")
 
-    # Default Positive/Negative/Variable fields
+    # Standard Positive/Negative/Variable dropdowns
     else:
         user_input[field] = st.selectbox(field, ["Unknown", "Positive", "Negative", "Variable"])
 
-# --- Identification Button ---
-if st.button("🔍 Identify"):
-    with st.spinner("Analyzing test results..."):
+# --- Identify Button ---
+if st.button("Identify Bacteria"):
+    with st.spinner("Analyzing results..."):
         results = eng.identify(user_input)
         if results.empty:
-            st.error("No matches found. Try adjusting some results or ensure valid data entry.")
+            st.error("No matches found. Try changing a few inputs or ensure valid data entry.")
         else:
             st.success("Top possible matches:")
             st.dataframe(results)
 
-st.caption("Built by Zain — powered by Python.")
+st.caption("BactAI-D © – Created by Zain.")
