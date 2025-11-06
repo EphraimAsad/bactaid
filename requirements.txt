@@ -2,3 +2,5 @@ pandas
 numpy
 streamlit
 openpyxl
+fpdf
+
