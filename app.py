@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 import re
 import os
-from fpdf import FPDF  # For PDF export
-from engine import BacteriaIdentifier  # Ensure engine.py is in same folder
+from datetime import datetime
+from fpdf import FPDF
+from engine import BacteriaIdentifier  # Make sure engine.py is in the same folder
 
-# --- Load the database ---
+# --- Load database ---
 @st.cache_data
 def load_data():
     data_path = os.path.join("bacteria_db.xlsx")
@@ -14,7 +15,7 @@ def load_data():
 db = load_data()
 eng = BacteriaIdentifier(db)
 
-# --- Sidebar input section ---
+# --- Sidebar Input Section ---
 st.sidebar.title("BactAI-D 🧫")
 st.sidebar.write("Enter your biochemical or morphological test results below.")
 st.sidebar.write("Leave any field as 'Unknown' if you haven’t done that test yet.")
@@ -28,15 +29,14 @@ fields = [
     "Gelatin Hydrolysis", "Esculin Hydrolysis", "Dnase", "ONPG", "NaCl Tolerant (>=6%)"
 ]
 
-# --- Create / reset session state for inputs ---
+# --- Initialize Session State ---
 if "user_input" not in st.session_state:
     st.session_state.user_input = {f: "Unknown" for f in fields}
 if "results" not in st.session_state:
     st.session_state.results = pd.DataFrame()
 
-# --- Sidebar input fields ---
+# --- Sidebar Fields ---
 for field in fields:
-    # Multi-option descriptive fields
     if field in ["Colony Morphology", "Media Grown On", "Oxygen Requirement", "Haemolysis Type"]:
         all_vals = []
         for v in eng.db[field]:
@@ -46,8 +46,16 @@ for field in fields:
                 if clean and clean not in all_vals:
                     all_vals.append(clean)
         all_vals.sort()
+
+        if st.session_state.user_input[field] in all_vals:
+            idx = all_vals.index(st.session_state.user_input[field]) + 1
+        else:
+            idx = 0
+
         st.session_state.user_input[field] = st.sidebar.selectbox(
-            field, ["Unknown"] + all_vals, index=["Unknown"] + all_vals.index(st.session_state.user_input[field]) if st.session_state.user_input[field] in all_vals else 0
+            field,
+            ["Unknown"] + all_vals,
+            index=idx
         )
 
     elif field == "Growth Temperature":
@@ -56,29 +64,30 @@ for field in fields:
         )
 
     else:
+        options = ["Unknown", "Positive", "Negative", "Variable"]
+        if st.session_state.user_input[field] in options:
+            idx = options.index(st.session_state.user_input[field])
+        else:
+            idx = 0
         st.session_state.user_input[field] = st.sidebar.selectbox(
-            field,
-            ["Unknown", "Positive", "Negative", "Variable"],
-            index=["Unknown", "Positive", "Negative", "Variable"].index(st.session_state.user_input[field])
-            if st.session_state.user_input[field] in ["Unknown", "Positive", "Negative", "Variable"]
-            else 0,
+            field, options, index=idx
         )
 
-# --- Buttons ---
+# --- Sidebar Buttons ---
 col1, col2 = st.sidebar.columns(2)
-identify_clicked = col1.button("🔍 Identify Bacteria")
-reset_clicked = col2.button("🔄 Reset Inputs")
+identify_clicked = col1.button("🔍 Identify")
+reset_clicked = col2.button("🔄 Reset")
 
 if reset_clicked:
     st.session_state.user_input = {f: "Unknown" for f in fields}
     st.session_state.results = pd.DataFrame()
     st.experimental_rerun()
 
-# --- Main section ---
+# --- Main Page Layout ---
 st.title("BactAI-D: Bacterial Identification Assistant")
-st.write("This tool compares your test results with over 150 bacterial genera to suggest the most likely matches.")
+st.write("Compare your biochemical results against a database of 150+ bacterial genera for likely matches.")
 
-# --- Identify logic ---
+# --- Identify Logic ---
 if identify_clicked:
     with st.spinner("Analyzing results..."):
         results = eng.identify(st.session_state.user_input)
@@ -86,36 +95,50 @@ if identify_clicked:
         if results.empty:
             st.error("No matches found. Try adjusting your inputs.")
         else:
-            st.success("Top possible matches:")
+            st.success("Top Possible Matches:")
             st.dataframe(results)
 
-# --- PDF Export ---
+# --- PDF Export Function ---
+def export_pdf(dataframe, user_input):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "BactAI-D Identification Report", ln=True, align="C")
+
+    pdf.set_font("Arial", size=12)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    pdf.cell(0, 10, f"Generated: {timestamp}", ln=True, align="R")
+    pdf.ln(5)
+
+    # --- Input Section ---
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "Entered Tests", ln=True)
+    pdf.set_font("Arial", size=11)
+    for k, v in user_input.items():
+        pdf.multi_cell(0, 8, f"• {k}: {v}")
+
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "Top Matches", ln=True)
+    pdf.set_font("Arial", size=11)
+
+    # --- Results Section ---
+    for i, row in dataframe.iterrows():
+        pdf.cell(0, 8, f"{i+1}. {row['Genus']}", ln=True)
+        for col in dataframe.columns:
+            if col != "Genus":
+                pdf.cell(0, 8, f"   - {col}: {row[col]}", ln=True)
+        pdf.ln(2)
+
+    output_path = "BactAI-D_Report.pdf"
+    pdf.output(output_path)
+    return output_path
+
+# --- PDF Export Button ---
 if not st.session_state.results.empty:
-    def export_pdf(dataframe, user_input):
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(200, 10, txt="BactAI-D Identification Report", ln=True, align="C")
-
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt="Entered Tests:", ln=True, align="L")
-
-        for k, v in user_input.items():
-            pdf.multi_cell(0, 8, f"{k}: {v}")
-
-        pdf.cell(200, 10, txt="\nTop Matches:", ln=True, align="L")
-        pdf.set_font("Arial", size=11)
-        for i, row in dataframe.iterrows():
-            row_text = ", ".join([f"{col}: {row[col]}" for col in dataframe.columns])
-            pdf.multi_cell(0, 8, row_text)
-
-        output_path = "BactAI-D_Report.pdf"
-        pdf.output(output_path)
-        return output_path
-
     if st.button("📄 Export Results to PDF"):
         pdf_path = export_pdf(st.session_state.results, st.session_state.user_input)
         with open(pdf_path, "rb") as f:
             st.download_button("⬇️ Download PDF", f, file_name="BactAI-D_Report.pdf")
 
-st.caption("BactAI-D © — Built by Zain")
+st.caption("BactAI-D © — Built by Zain.")
