@@ -1,15 +1,26 @@
 import streamlit as st
 import pandas as pd
-import re
-from engine import BacteriaIdentifier  # Ensure engine.py is in the same folder
-
-# --- Load the database ---
 import os
+from engine import BacteriaIdentifier
 
 @st.cache_data
 def load_data():
-    data_path = os.path.join("bacteria_db.xlsx")
-    return pd.read_excel(data_path)
+    data_path = "bacteria_db.xlsx"
+    st.write("🔍 Current working directory:", os.getcwd())
+    st.write("📁 Files in directory:", os.listdir())
+    st.write("🔎 Looking for:", data_path)
+
+    if not os.path.exists(data_path):
+        st.error(f"❌ File not found: {data_path}")
+        st.stop()
+
+    try:
+        df = pd.read_excel(data_path, engine="openpyxl")
+        st.success("✅ Database loaded successfully!")
+        return df
+    except Exception as e:
+        st.error(f"⚠️ Error reading Excel: {e}")
+        st.stop()
 
 db = load_data()
 eng = BacteriaIdentifier(db)
@@ -90,4 +101,5 @@ if st.sidebar.button("🔍 Identify"):
 # --- Footer ---
 st.markdown("---")
 st.caption("AI Bacteria Identification Assistant | Built by [Zain] 🧫 Powered by Python")
+
 
