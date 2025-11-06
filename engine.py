@@ -52,25 +52,21 @@ class BacteriaIdentifier:
 
     def compare_field(self, db_val, user_val, field_name):
         """Compares one field between database and user input, returning match score."""
-        if not user_val or str(user_val).strip() == "":
+        if not user_val or str(user_val).strip() == "" or user_val.lower() == "unknown":
             return 0  # no data provided
 
         db_val = str(db_val).strip()
         user_val = str(user_val).strip()
 
-        # Hard exclusion fields
         hard_exclusions = ["Gram Stain", "Shape", "Spore Formation"]
 
         # Split entries for multi-value comparison
-        db_options = re.split(r"[;/]", db_val)
-        user_options = re.split(r"[;/]", user_val)
+        db_options = [x.strip().lower() for x in re.split(r"[;/]", db_val) if x.strip()]
+        user_options = [x.strip().lower() for x in re.split(r"[;/]", user_val) if x.strip()]
 
-        db_options = [x.strip().lower() for x in db_options if x.strip()]
-        user_options = [x.strip().lower() for x in user_options if x.strip()]
-
-        # Handle variable logic
+        # Variable handling: don't exclude based on "variable"
         if "variable" in db_options or "variable" in user_options:
-            return 0  # do not exclude based on variable
+            return 0
 
         # Special case: temperature range
         if field_name == "Growth Temperature":
@@ -82,14 +78,24 @@ class BacteriaIdentifier:
             except:
                 return 0
 
-        # Normal comparison
-        match_found = any(u in db_options for u in user_options)
+        # Check for matches (case-insensitive, partial allowed)
+        match_found = any(
+            u == d or u in d or d in u
+            for u in user_options
+            for d in db_options
+        )
 
+        # --- Hard exclusion logic ---
+        if field_name in hard_exclusions:
+            if not match_found and "variable" not in db_options:
+                return -999  # only exclude if truly no overlap
+            else:
+                return 1 if match_found else 0
+
+        # --- Normal comparison logic ---
         if match_found:
             return 1
         else:
-            if field_name in hard_exclusions:
-                return -999  # Hard exclude if critical field doesn't match
             return -1
 
     def identify(self, user_input):
@@ -129,4 +135,4 @@ class BacteriaIdentifier:
 
         # Sort by score descending
         results.sort(key=lambda x: x.total_score, reverse=True)
-        return results[:10]  # return top 10
+        return [[r.genus, r.total_score] for r in results[:10]]  # clean output for app
