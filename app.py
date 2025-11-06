@@ -8,7 +8,7 @@ import os
 
 @st.cache_data
 def load_data():
-    data_path = os.path.join("data", "bacteria_db.xlsx")
+    data_path = os.path.join("bacteria_db.xlsx")
     return pd.read_excel(data_path)
 
 db = load_data()
@@ -90,3 +90,4 @@ if st.sidebar.button("🔍 Identify"):
 # --- Footer ---
 st.markdown("---")
 st.caption("AI Bacteria Identification Assistant | Built by [Zain] 🧫 Powered by Python")
+
