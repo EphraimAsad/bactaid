@@ -13,11 +13,11 @@ def load_data():
 db = load_data()
 eng = BacteriaIdentifier(db)
 
-st.title("BactAI-D – Bacterial Identification Assistant")
+# --- Sidebar input section ---
+st.sidebar.title("BactAI-D 🧫")
+st.sidebar.write("Enter your biochemical or morphological test results below.")
+st.sidebar.write("Leave any field as 'Unknown' if you haven’t done that test yet.")
 
-st.write("Enter your test results below. You can leave any field as 'Unknown' if you haven’t done that test yet.")
-
-# --- Input Fields ---
 fields = [
     "Gram Stain", "Shape", "Catalase", "Oxidase", "Colony Morphology", "Haemolysis",
     "Haemolysis Type", "Indole", "Growth Temperature", "Media Grown On", "Motility",
@@ -29,8 +29,9 @@ fields = [
 
 user_input = {}
 
+# --- Input fields inside the sidebar ---
 for field in fields:
-    # Handle fields with multiple descriptive options
+    # Multi-option descriptive fields
     if field in ["Colony Morphology", "Media Grown On", "Oxygen Requirement", "Haemolysis Type"]:
         all_vals = []
         for v in eng.db[field]:
@@ -40,24 +41,28 @@ for field in fields:
                 if clean and clean not in all_vals:
                     all_vals.append(clean)
         all_vals.sort()
-        user_input[field] = st.selectbox(field, ["Unknown"] + all_vals)
+        user_input[field] = st.sidebar.selectbox(field, ["Unknown"] + all_vals)
 
-    # Growth temperature stays a text input
+    # Temperature input
     elif field == "Growth Temperature":
-        user_input[field] = st.text_input("Growth Temperature (e.g., 10//40)", "Unknown")
+        user_input[field] = st.sidebar.text_input("Growth Temperature (e.g., 10//40)", "Unknown")
 
-    # Standard Positive/Negative/Variable dropdowns
+    # Standard biochemical test fields
     else:
-        user_input[field] = st.selectbox(field, ["Unknown", "Positive", "Negative", "Variable"])
+        user_input[field] = st.sidebar.selectbox(field, ["Unknown", "Positive", "Negative", "Variable"])
+
+# --- Main page ---
+st.title("BactAI-D: Bacterial Identification Assistant")
+st.write("This tool compares your test results with over 150 bacterial genera to suggest the most likely matches.")
 
 # --- Identify Button ---
-if st.button("Identify Bacteria"):
+if st.sidebar.button("🔍 Identify Bacteria"):
     with st.spinner("Analyzing results..."):
         results = eng.identify(user_input)
         if results.empty:
-            st.error("No matches found. Try changing a few inputs or ensure valid data entry.")
+            st.error("No matches found. Try adjusting your inputs.")
         else:
             st.success("Top possible matches:")
             st.dataframe(results)
 
-st.caption("BactAI-D © – Created by Zain.")
+st.caption("BactAI-D © — Built by Zain")
