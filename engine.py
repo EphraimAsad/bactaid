@@ -11,8 +11,34 @@ class IdentificationResult:
         self.reasoning_factors = reasoning_factors
         self.extra_notes = extra_notes
 
+    def confidence_percent(self):
+        """Convert raw score to 0–100 confidence scale."""
+        # Assume 30 max differentiating fields gives roughly 15 meaningful points.
+        # Normalize and bound between 0–100.
+        normalized = max(0, min(100, int((self.total_score / 15) * 100)))
+        return normalized
+
+    def confidence_colour(self):
+        """Assign a colour label based on confidence."""
+        val = self.confidence_percent()
+        if val >= 75:
+            return "🟩 High"
+        elif val >= 50:
+            return "🟨 Moderate"
+        elif val >= 25:
+            return "🟧 Low"
+        else:
+            return "🟥 Very Low"
+
+    def next_test_suggestion(self):
+        """Suggest one next test to help differentiate."""
+        if not self.mismatched_fields:
+            return "All observed characteristics align. No further tests required."
+        next_test = random.choice(self.mismatched_fields)
+        return f"Perform or review **{next_test}** to confirm identification."
+
     def reasoning_paragraph(self):
-        """Generate a natural-language explanation of why this genus was chosen."""
+        """Generate a natural-language reasoning paragraph."""
         if not self.matched_fields:
             return "No significant biochemical or morphological matches were found."
 
@@ -36,12 +62,12 @@ class IdentificationResult:
             highlights.append(f"which prefers **{self.reasoning_factors.get('Oxygen Requirement', '').lower()}** growth conditions")
 
         summary = " ".join(highlights)
-        confidence = "The confidence in this identification is moderate." if self.total_score < 5 else "The confidence in this identification is high."
+        confidence = f"The confidence in this identification is **{self.confidence_colour()}**."
 
         suggestion = ""
         if len(self.mismatched_fields) > 0:
             next_test = random.choice(self.mismatched_fields)
-            suggestion = f" To confirm this identification, it is recommended to perform or review the **{next_test}** test."
+            suggestion = f" To further confirm this identification, it is recommended to perform or review the **{next_test}** test."
 
         return f"{intro} {summary}, the isolate most closely resembles **{self.genus}**. {confidence}{suggestion}"
 
@@ -78,25 +104,21 @@ class BacteriaIdentifier:
             except:
                 return 0
 
-        # Check for matches (case-insensitive, partial allowed)
+        # Case-insensitive, partial matching
         match_found = any(
             u == d or u in d or d in u
             for u in user_options
             for d in db_options
         )
 
-        # --- Hard exclusion logic ---
+        # Hard exclusion logic
         if field_name in hard_exclusions:
             if not match_found and "variable" not in db_options:
-                return -999  # only exclude if truly no overlap
+                return -999
             else:
                 return 1 if match_found else 0
 
-        # --- Normal comparison logic ---
-        if match_found:
-            return 1
-        else:
-            return -1
+        return 1 if match_found else -1
 
     def identify(self, user_input):
         """Main identification logic."""
@@ -131,8 +153,29 @@ class BacteriaIdentifier:
 
             if total_score > -999:
                 extra_notes = row.get("Extra Notes", "")
-                results.append(IdentificationResult(genus, total_score, matched_fields, mismatched_fields, reasoning_factors, extra_notes))
+                result = IdentificationResult(
+                    genus,
+                    total_score,
+                    matched_fields,
+                    mismatched_fields,
+                    reasoning_factors,
+                    extra_notes
+                )
+                results.append(result)
 
-        # Sort by score descending
+        # Sort by total_score descending
         results.sort(key=lambda x: x.total_score, reverse=True)
-        return [[r.genus, r.total_score] for r in results[:10]]  # clean output for app
+
+        # Convert to dataframe format expected by app
+        data = []
+        for r in results[:10]:
+            data.append({
+                "Genus": r.genus,
+                "Confidence (%)": r.confidence_percent(),
+                "Confidence Level": r.confidence_colour(),
+                "AI Reasoning": r.reasoning_paragraph(),
+                "Next Test Suggestion": r.next_test_suggestion(),
+                "Extra Notes": r.extra_notes
+            })
+
+        return pd.DataFrame(data)
