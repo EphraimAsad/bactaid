@@ -4,7 +4,7 @@ import re
 import os
 from datetime import datetime
 from fpdf import FPDF
-from engine import BacteriaIdentifier  # Make sure engine.py is in the same folder
+from engine import BacteriaIdentifier  # Ensure engine.py is in the same folder
 
 # --- Load database ---
 @st.cache_data
@@ -92,10 +92,11 @@ if identify_clicked:
     with st.spinner("Analyzing results..."):
         results = eng.identify(st.session_state.user_input)
 
-        # --- Ensure DataFrame format ---
+        # --- Ensure DataFrame format (safe version) ---
         if isinstance(results, list):
-            # If results are a list of lists (e.g. [['E.coli', 95], ['Salmonella', 87]])
-            if all(isinstance(r, (list, tuple)) for r in results):
+            if len(results) == 0:
+                results = pd.DataFrame(columns=["Genus"])
+            elif all(isinstance(r, (list, tuple)) for r in results):
                 num_cols = len(results[0])
                 if num_cols == 2:
                     results = pd.DataFrame(results, columns=["Genus", "Confidence"])
@@ -103,7 +104,6 @@ if identify_clicked:
                     col_names = [f"Column_{i+1}" for i in range(num_cols)]
                     results = pd.DataFrame(results, columns=col_names)
             else:
-                # If it's a flat list like ['E.coli', 'Salmonella']
                 results = pd.DataFrame(results, columns=["Genus"])
 
         st.session_state.results = results
