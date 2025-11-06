@@ -48,8 +48,8 @@ for field in eng.db.columns:
                     clean = p.strip()
                     if clean and clean not in all_vals:
                        all_vals.append(clean)
-           all_vals.sort()
-           user_input[field] = st.selectbox(field, ["Unknown"] + all_vals)
+        all_vals.sort()
+        user_input[field] = st.selectbox(field, ["Unknown"] + all_vals)
 
     # --- Special fields ---
     elif field == "Growth Temperature":
@@ -97,6 +97,7 @@ if st.sidebar.button("🔍 Identify"):
 # --- Footer ---
 st.markdown("---")
 st.caption("AI Bacteria Identification Assistant | Built by [Zain] 🧫 Powered by Python")
+
 
 
 
