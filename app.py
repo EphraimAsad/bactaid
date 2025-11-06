@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 import os
 from engine import BacteriaIdentifier
 
@@ -101,5 +102,6 @@ if st.sidebar.button("🔍 Identify"):
 # --- Footer ---
 st.markdown("---")
 st.caption("AI Bacteria Identification Assistant | Built by [Zain] 🧫 Powered by Python")
+
 
 
