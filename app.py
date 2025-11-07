@@ -141,6 +141,7 @@ def export_pdf(results_df, user_input):
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, "BactAI-d Identification Report", ln=True, align="C")
+
     pdf.set_font("Helvetica", "", 11)
     pdf.cell(0, 8, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
     pdf.ln(4)
@@ -149,20 +150,26 @@ def export_pdf(results_df, user_input):
     pdf.cell(0, 8, "Entered Test Results:", ln=True)
     pdf.set_font("Helvetica", "", 10)
     for k, v in user_input.items():
-        pdf.multi_cell(0, 6, f"• {k}: {v}")
+        safe_line = f"- {k}: {v}".encode("latin-1", "replace").decode("latin-1")
+        pdf.multi_cell(0, 6, safe_line)
 
     pdf.ln(6)
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Top Possible Matches:", ln=True)
-
     pdf.set_font("Helvetica", "", 10)
+
     for _, row in results_df.iterrows():
-        pdf.multi_cell(0, 7, f"• {row['Genus']} — Confidence: {row['Confidence']} (True: {row['True Confidence (All Tests)']})")
-        pdf.multi_cell(0, 6, f"  Reasoning: {row['Reasoning']}")
-        if row['Next Tests']:
-            pdf.multi_cell(0, 6, f"  Next Tests: {row['Next Tests']}")
-        if row['Extra Notes']:
-            pdf.multi_cell(0, 6, f"  Notes: {row['Extra Notes']}")
+        safe_genus = row['Genus'].encode("latin-1", "replace").decode("latin-1")
+        safe_reason = row['Reasoning'].encode("latin-1", "replace").decode("latin-1")
+        safe_next = row['Next Tests'].encode("latin-1", "replace").decode("latin-1")
+        safe_notes = row['Extra Notes'].encode("latin-1", "replace").decode("latin-1")
+
+        pdf.multi_cell(0, 7, f"- {safe_genus} — Confidence: {row['Confidence']} (True: {row['True Confidence (All Tests)']})")
+        pdf.multi_cell(0, 6, f"  Reasoning: {safe_reason}")
+        if safe_next:
+            pdf.multi_cell(0, 6, f"  Next Tests: {safe_next}")
+        if safe_notes:
+            pdf.multi_cell(0, 6, f"  Notes: {safe_notes}")
         pdf.ln(3)
 
     pdf.output("BactAI-d_Report.pdf")
@@ -177,3 +184,4 @@ if not st.session_state.results.empty:
 # --- FOOTER ---
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | Powered by BactAI-d</div>", unsafe_allow_html=True)
+
