@@ -74,14 +74,10 @@ def confidence_gradient(conf_pct):
     """Generate a smooth color gradient from red (low) → green (high)."""
     red = int(255 - (conf_pct * 2.55))
     green = int(conf_pct * 2.55)
-    return f"rgb({red},{green},60)"  # warm tone gradient
+    return f"rgb({red},{green},60)"
 
 # --- SMART NEXT STEP FUNCTION ---
 def suggest_next_tests(user_input, db, top_results):
-    """
-    Suggest which unknown tests would most differentiate the top candidates.
-    Excludes 'Extra Notes' and 'Colony Morphology'.
-    """
     if len(top_results) < 2:
         return "All known fields already consistent. No further differentiation required."
 
@@ -94,7 +90,6 @@ def suggest_next_tests(user_input, db, top_results):
     if not unknown_fields:
         return "No untested fields available for further differentiation."
 
-    # Calculate which unknown field varies most across top genera
     field_variability = {}
     for field in unknown_fields:
         unique_vals = set()
@@ -107,9 +102,30 @@ def suggest_next_tests(user_input, db, top_results):
     if not field_variability:
         return "No further key differentiating tests identified."
 
-    # Pick the most variable field as the best next step
     best_field = max(field_variability, key=field_variability.get)
     return f"Perform or review the **{best_field}** test to further differentiate among top candidates."
+
+# --- COMPARATIVE REASONING FUNCTION ---
+def generate_reasoning(main_row, second_row, user_input):
+    """Describe how the top genus differs from the runner-up based on key traits."""
+    genus1 = main_row["Genus"]
+    genus2 = second_row["Genus"]
+    differences = []
+
+    for field, val in user_input.items():
+        if field == "Genus" or val in ["Unknown", ""]:
+            continue
+        db_val1 = str(db.loc[db["Genus"] == genus1, field].values[0]) if not db.loc[db["Genus"] == genus1].empty else ""
+        db_val2 = str(db.loc[db["Genus"] == genus2, field].values[0]) if not db.loc[db["Genus"] == genus2].empty else ""
+        if db_val1.lower() != db_val2.lower():
+            differences.append(field)
+
+    if not differences:
+        return f"The biochemical profile matches **{genus1}** closely, showing minimal distinction from {genus2}."
+
+    key_fields = ", ".join(differences[:3])
+    return (f"The isolate aligns best with **{genus1}**, differing from *{genus2}* primarily in "
+            f"{key_fields.lower()}. These results support identification as **{genus1}**.")
 
 # --- DISPLAY RESULTS ---
 if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.results.empty:
@@ -121,7 +137,6 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
         conf_lvl = row["Confidence Level"]
         color = confidence_gradient(conf_pct)
 
-        # Header with gradient badge
         header_html = f"""
         <div style='background:{color}; padding:8px; border-radius:8px; margin-bottom:4px; color:white;'>
             <strong>{idx+1}. {genus}</strong> — {conf_lvl} ({conf_pct:.1f}%)
@@ -130,7 +145,12 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
         st.markdown(header_html, unsafe_allow_html=True)
 
         with st.expander("Details & Reasoning"):
-            st.markdown(f"**Reasoning:** {row['Reasoning']}")
+            if idx == 0 and len(st.session_state.results) > 1:
+                reasoning = generate_reasoning(row, st.session_state.results.iloc[1], st.session_state.user_input)
+            else:
+                reasoning = row["Reasoning"]
+
+            st.markdown(f"**Reasoning:** {reasoning}")
             next_step = suggest_next_tests(st.session_state.user_input, db, st.session_state.results.head(5))
             st.markdown(f"**Next Step:** {next_step}")
             if row['Extra Notes']:
@@ -141,11 +161,9 @@ else:
 
 # --- PDF EXPORT ---
 def safe_text(s):
-    """Ensure unicode characters are encoded safely for PDF output."""
     return str(s).encode('latin-1', 'replace').decode('latin-1')
 
 def export_pdf(df, user_input):
-    """Generate a Unicode-safe PDF report."""
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", size=11)
@@ -160,11 +178,15 @@ def export_pdf(df, user_input):
         pdf.cell(0, 8, safe_text(f"{k}: {v}"), ln=True)
     pdf.ln(10)
 
-    for _, row in df.iterrows():
+    for i, row in df.iterrows():
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(0, 8, safe_text(f"{row['Genus']} — {row['Confidence Level']} ({row['Confidence (%)']}%)"), ln=True)
         pdf.set_font("Helvetica", size=10)
-        pdf.multi_cell(0, 8, safe_text(f"Reasoning: {row['Reasoning']}"))
+        if i == 0 and len(df) > 1:
+            reasoning = generate_reasoning(row, df.iloc[1], user_input)
+        else:
+            reasoning = row["Reasoning"]
+        pdf.multi_cell(0, 8, safe_text(f"Reasoning: {reasoning}"))
         next_step = suggest_next_tests(user_input, db, df.head(5))
         pdf.multi_cell(0, 8, safe_text(f"Next Step: {next_step}"))
         if row['Extra Notes']:
