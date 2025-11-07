@@ -45,9 +45,7 @@ for field in eng.db.columns:
                     all_vals.append(clean)
         all_vals.sort()
         st.session_state.user_input[field] = st.sidebar.selectbox(
-            field,
-            ["Unknown"] + all_vals,
-            key=field
+            field, ["Unknown"] + all_vals, key=field
         )
     elif field == "Growth Temperature":
         st.session_state.user_input[field] = st.sidebar.text_input(field, "", key=field)
@@ -71,18 +69,12 @@ if st.sidebar.button("🔍 Identify"):
         results = eng.identify(st.session_state.user_input)
         st.session_state.results = results
 
-# --- COLOR MAP FUNCTION ---
-def confidence_color(level):
-    level = level.lower()
-    if "very high" in level:
-        return "#2ecc71"   # green
-    elif "high" in level:
-        return "#f1c40f"   # yellow
-    elif "moderate" in level:
-        return "#e67e22"   # orange
-    elif "low" in level:
-        return "#e74c3c"   # red
-    return "#bdc3c7"       # grey fallback
+# --- COLOR GRADIENT FUNCTION ---
+def confidence_gradient(conf_pct):
+    """Generate a smooth color gradient from red (low) → green (high)."""
+    red = int(255 - (conf_pct * 2.55))
+    green = int(conf_pct * 2.55)
+    return f"rgb({red},{green},60)"  # warm tone gradient
 
 # --- DISPLAY RESULTS ---
 if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.results.empty:
@@ -90,21 +82,26 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
 
     for idx, row in st.session_state.results.iterrows():
         genus = row["Genus"]
-        conf_pct = row["Confidence (%)"]
+        conf_pct = float(row["Confidence (%)"])
         conf_lvl = row["Confidence Level"]
-        color = confidence_color(conf_lvl)
 
-        # Header with colored badge
+        color = confidence_gradient(conf_pct)
+
+        # Header with gradient badge
         header_html = f"""
-        <div style='background-color:{color}; padding:8px; border-radius:8px; margin-bottom:4px;'>
-            <strong>{idx+1}. {genus}</strong> — {conf_lvl} ({conf_pct}%)
+        <div style='background:{color}; padding:8px; border-radius:8px; margin-bottom:4px; color:white;'>
+            <strong>{idx+1}. {genus}</strong> — {conf_lvl} ({conf_pct:.1f}%)
         </div>
         """
         st.markdown(header_html, unsafe_allow_html=True)
 
         with st.expander("Details & Reasoning"):
             st.markdown(f"**Reasoning:** {row['Reasoning']}")
-            st.markdown(f"**Next Step:** {row['Next Step Suggestion']}")
+            # Filter Next Step suggestions (remove irrelevant ones)
+            suggestion = row['Next Step Suggestion']
+            if any(x in suggestion for x in ["Extra Notes", "Colony Morphology"]):
+                suggestion = "No further key differentiating tests identified."
+            st.markdown(f"**Next Step:** {suggestion}")
             if row['Extra Notes']:
                 st.markdown(f"**Notes:** {row['Extra Notes']}")
 
@@ -137,7 +134,10 @@ def export_pdf(df, user_input):
         pdf.cell(0, 8, safe_text(f"{row['Genus']} — {row['Confidence Level']} ({row['Confidence (%)']}%)"), ln=True)
         pdf.set_font("Helvetica", size=10)
         pdf.multi_cell(0, 8, safe_text(f"Reasoning: {row['Reasoning']}"))
-        pdf.multi_cell(0, 8, safe_text(f"Next Step: {row['Next Step Suggestion']}"))
+        suggestion = row['Next Step Suggestion']
+        if any(x in suggestion for x in ["Extra Notes", "Colony Morphology"]):
+            suggestion = "No further key differentiating tests identified."
+        pdf.multi_cell(0, 8, safe_text(f"Next Step: {suggestion}"))
         if row['Extra Notes']:
             pdf.multi_cell(0, 8, safe_text(f"Notes: {row['Extra Notes']}"))
         pdf.ln(4)
