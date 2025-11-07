@@ -6,7 +6,7 @@ from fpdf import FPDF
 from datetime import datetime
 from engine import BacteriaIdentifier
 
-# --- CONFIG ---
+# --- PAGE CONFIG ---
 st.set_page_config(page_title="BactAI-D Assistant", layout="wide")
 st.title("🧫 BactAI-D — Intelligent Bacterial Identification Assistant")
 
@@ -23,7 +23,7 @@ def load_data():
 db = load_data()
 eng = BacteriaIdentifier(db)
 
-# --- SESSION STATE ---
+# --- SESSION STATE INIT ---
 if "user_input" not in st.session_state:
     st.session_state.user_input = {}
 if "results" not in st.session_state:
@@ -58,9 +58,18 @@ for field in eng.db.columns:
 
 # --- RESET BUTTON ---
 if st.sidebar.button("🔄 Reset All Inputs"):
+    # Reset stored input values
     for key in list(st.session_state.user_input.keys()):
         st.session_state.user_input[key] = "Unknown"
-        st.session_state[key] = "Unknown"
+
+    # Clear results
+    st.session_state.results = pd.DataFrame()
+
+    # Show a confirmation toast before rerun
+    st.toast("✅ All inputs reset successfully", icon="🔁")
+
+    # Force a fresh rerun (clean rebuild of widgets)
+    st.experimental_set_query_params(reset="1")
     st.rerun()
 
 # --- IDENTIFY BUTTON ---
@@ -74,7 +83,6 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
     st.success("### Top Possible Matches:")
 
     for idx, row in st.session_state.results.iterrows():
-        # Clean heading line
         genus = row["Genus"]
         conf_pct = row["Confidence (%)"]
         conf_lvl = row["Confidence Level"]
@@ -90,7 +98,6 @@ else:
     st.info("Enter your results on the left and click **Identify** to begin analysis.")
 
 # --- PDF EXPORT ---
-
 def safe_text(s):
     """Ensure unicode characters are encoded safely for PDF output."""
     return str(s).encode('latin-1', 'replace').decode('latin-1')
@@ -131,4 +138,3 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
         pdf_path = export_pdf(st.session_state.results, st.session_state.user_input)
         with open(pdf_path, "rb") as f:
             st.download_button("⬇️ Download PDF", f, file_name="BactAI-D_Report.pdf")
-
