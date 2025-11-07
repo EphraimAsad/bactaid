@@ -58,17 +58,10 @@ for field in eng.db.columns:
 
 # --- RESET BUTTON ---
 if st.sidebar.button("🔄 Reset All Inputs"):
-    # Reset stored input values
     for key in list(st.session_state.user_input.keys()):
         st.session_state.user_input[key] = "Unknown"
-
-    # Clear results
     st.session_state.results = pd.DataFrame()
-
-    # Show a confirmation toast before rerun
     st.toast("✅ All inputs reset successfully", icon="🔁")
-
-    # Force a fresh rerun (clean rebuild of widgets)
     st.experimental_set_query_params(reset="1")
     st.rerun()
 
@@ -78,6 +71,19 @@ if st.sidebar.button("🔍 Identify"):
         results = eng.identify(st.session_state.user_input)
         st.session_state.results = results
 
+# --- COLOR MAP FUNCTION ---
+def confidence_color(level):
+    level = level.lower()
+    if "very high" in level:
+        return "#2ecc71"   # green
+    elif "high" in level:
+        return "#f1c40f"   # yellow
+    elif "moderate" in level:
+        return "#e67e22"   # orange
+    elif "low" in level:
+        return "#e74c3c"   # red
+    return "#bdc3c7"       # grey fallback
+
 # --- DISPLAY RESULTS ---
 if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.results.empty:
     st.success("### Top Possible Matches:")
@@ -86,9 +92,17 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
         genus = row["Genus"]
         conf_pct = row["Confidence (%)"]
         conf_lvl = row["Confidence Level"]
+        color = confidence_color(conf_lvl)
 
-        header = f"**{idx+1}. {genus}** — {conf_lvl} ({conf_pct}%)"
-        with st.expander(header):
+        # Header with colored badge
+        header_html = f"""
+        <div style='background-color:{color}; padding:8px; border-radius:8px; margin-bottom:4px;'>
+            <strong>{idx+1}. {genus}</strong> — {conf_lvl} ({conf_pct}%)
+        </div>
+        """
+        st.markdown(header_html, unsafe_allow_html=True)
+
+        with st.expander("Details & Reasoning"):
             st.markdown(f"**Reasoning:** {row['Reasoning']}")
             st.markdown(f"**Next Step:** {row['Next Step Suggestion']}")
             if row['Extra Notes']:
@@ -138,3 +152,14 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
         pdf_path = export_pdf(st.session_state.results, st.session_state.user_input)
         with open(pdf_path, "rb") as f:
             st.download_button("⬇️ Download PDF", f, file_name="BactAI-D_Report.pdf")
+
+# --- FOOTER ---
+st.markdown(
+    """
+    <hr style="margin-top:50px; margin-bottom:10px;">
+    <div style='text-align:center; color:gray; font-size:14px;'>
+        Created by <strong>Zain</strong> — <em>BactAI-d Project</em> © 2025
+    </div>
+    """,
+    unsafe_allow_html=True
+)
