@@ -7,7 +7,7 @@ from datetime import datetime
 from engine import BacteriaIdentifier
 
 # --- CONFIG ---
-st.set_page_config(page_title="BactAI-d Assistant", layout="wide")
+st.set_page_config(page_title="BactAI-D Assistant", layout="wide")
 
 # --- LOAD DATA ---
 @st.cache_data
@@ -21,15 +21,17 @@ db = load_data()
 eng = BacteriaIdentifier(db)
 
 # --- PAGE HEADER ---
-st.title("🧫 BactAI-d: Intelligent Bacteria Identification Assistant")
+st.title("🧫 BactAI-D: Intelligent Bacteria Identification Assistant")
 st.markdown("Use the sidebar to input your biochemical and morphological results.")
 
 # --- FIELD GROUPS ---
 MORPH_FIELDS = ["Gram Stain", "Shape", "Colony Morphology", "Media Grown On", "Motility", "Capsule", "Spore Formation"]
 ENZYME_FIELDS = ["Catalase", "Oxidase", "Coagulase", "Lipase Test"]
-SUGAR_FIELDS = ["Glucose Fermentation", "Lactose Fermentation", "Sucrose Fermentation", "Maltose Fermentation", "Mannitol Fermentation",
-                "Sorbitol Fermentation", "Xylose Fermentation", "Rhamnose Fermentation", "Arabinose Fermentation", "Raffinose Fermentation",
-                "Trehalose Fermentation", "Inositol Fermentation"]
+SUGAR_FIELDS = [
+    "Glucose Fermantation", "Lactose Fermentation", "Sucrose Fermentation", "Maltose Fermentation",
+    "Mannitol Fermentation", "Sorbitol Fermentation", "Xylose Fermentation", "Rhamnose Fermentation",
+    "Arabinose Fermentation", "Raffinose Fermentation", "Trehalose Fermentation", "Inositol Fermentation"
+]
 
 # --- SESSION STATE ---
 if "user_input" not in st.session_state:
@@ -58,7 +60,7 @@ def get_unique_values(field):
     vals.sort()
     return vals
 
-# --- SIDE INPUT SECTIONS ---
+# --- SIDEBAR INPUTS ---
 with st.sidebar.expander("🧫 Morphological Tests", expanded=True):
     for field in MORPH_FIELDS:
         if field in ["Shape", "Colony Morphology", "Media Grown On"]:
@@ -137,6 +139,11 @@ if not st.session_state.results.empty:
 
 # --- PDF EXPORT ---
 def export_pdf(results_df, user_input):
+    def safe_text(text):
+        """Convert text to Latin-1 safe characters."""
+        text = str(text).replace("•", "-").replace("—", "-").replace("–", "-")
+        return text.encode("latin-1", "replace").decode("latin-1")
+
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
@@ -150,8 +157,7 @@ def export_pdf(results_df, user_input):
     pdf.cell(0, 8, "Entered Test Results:", ln=True)
     pdf.set_font("Helvetica", "", 10)
     for k, v in user_input.items():
-        safe_line = f"- {k}: {v}".encode("latin-1", "replace").decode("latin-1")
-        pdf.multi_cell(0, 6, safe_line)
+        pdf.multi_cell(0, 6, safe_text(f"- {k}: {v}"))
 
     pdf.ln(6)
     pdf.set_font("Helvetica", "B", 12)
@@ -159,17 +165,12 @@ def export_pdf(results_df, user_input):
     pdf.set_font("Helvetica", "", 10)
 
     for _, row in results_df.iterrows():
-        safe_genus = row['Genus'].encode("latin-1", "replace").decode("latin-1")
-        safe_reason = row['Reasoning'].encode("latin-1", "replace").decode("latin-1")
-        safe_next = row['Next Tests'].encode("latin-1", "replace").decode("latin-1")
-        safe_notes = row['Extra Notes'].encode("latin-1", "replace").decode("latin-1")
-
-        pdf.multi_cell(0, 7, f"- {safe_genus} — Confidence: {row['Confidence']} (True: {row['True Confidence (All Tests)']})")
-        pdf.multi_cell(0, 6, f"  Reasoning: {safe_reason}")
-        if safe_next:
-            pdf.multi_cell(0, 6, f"  Next Tests: {safe_next}")
-        if safe_notes:
-            pdf.multi_cell(0, 6, f"  Notes: {safe_notes}")
+        pdf.multi_cell(0, 7, safe_text(f"- {row['Genus']} — Confidence: {row['Confidence']} (True: {row['True Confidence (All Tests)']})"))
+        pdf.multi_cell(0, 6, safe_text(f"  Reasoning: {row['Reasoning']}"))
+        if row['Next Tests']:
+            pdf.multi_cell(0, 6, safe_text(f"  Next Tests: {row['Next Tests']}"))
+        if row['Extra Notes']:
+            pdf.multi_cell(0, 6, safe_text(f"  Notes: {row['Extra Notes']}"))
         pdf.ln(3)
 
     pdf.output("BactAI-d_Report.pdf")
@@ -183,5 +184,4 @@ if not st.session_state.results.empty:
 
 # --- FOOTER ---
 st.markdown("<hr>", unsafe_allow_html=True)
-st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | Powered by BactAI-d</div>", unsafe_allow_html=True)
-
+st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | Powered by BactAI-D</div>", unsafe_allow_html=True)
