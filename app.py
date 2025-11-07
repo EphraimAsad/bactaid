@@ -7,7 +7,7 @@ from datetime import datetime
 from engine import BacteriaIdentifier
 
 # --- CONFIG ---
-st.set_page_config(page_title="BactAI-D Assistant", layout="wide")
+st.set_page_config(page_title="BactAI-d Assistant", layout="wide")
 
 # --- LOAD DATA ---
 @st.cache_data
@@ -21,14 +21,14 @@ db = load_data()
 eng = BacteriaIdentifier(db)
 
 # --- PAGE HEADER ---
-st.title("🧫 BactAI-D: Intelligent Bacteria Identification Assistant")
+st.title("🧫 BactAI-d: Intelligent Bacteria Identification Assistant")
 st.markdown("Use the sidebar to input your biochemical and morphological results.")
 
 # --- FIELD GROUPS ---
 MORPH_FIELDS = ["Gram Stain", "Shape", "Colony Morphology", "Media Grown On", "Motility", "Capsule", "Spore Formation"]
 ENZYME_FIELDS = ["Catalase", "Oxidase", "Coagulase", "Lipase Test"]
 SUGAR_FIELDS = [
-    "Glucose Fermantation", "Lactose Fermentation", "Sucrose Fermentation", "Maltose Fermentation",
+    "Glucose Fermentation", "Lactose Fermentation", "Sucrose Fermentation", "Maltose Fermentation",
     "Mannitol Fermentation", "Sorbitol Fermentation", "Xylose Fermentation", "Rhamnose Fermentation",
     "Arabinose Fermentation", "Raffinose Fermentation", "Trehalose Fermentation", "Inositol Fermentation"
 ]
@@ -38,6 +38,21 @@ if "user_input" not in st.session_state:
     st.session_state.user_input = {}
 if "results" not in st.session_state:
     st.session_state.results = pd.DataFrame()
+
+# --- RESET TRIGGER HANDLER (before widgets are created) ---
+if "reset_trigger" in st.session_state and st.session_state["reset_trigger"]:
+    for key in list(st.session_state.user_input.keys()):
+        st.session_state.user_input[key] = "Unknown"
+
+    for key in list(st.session_state.keys()):
+        if key not in ["user_input", "results", "reset_trigger"]:
+            if isinstance(st.session_state[key], list):
+                st.session_state[key] = []
+            else:
+                st.session_state[key] = "Unknown"
+
+    st.session_state["reset_trigger"] = False
+    st.rerun()
 
 # --- SIDEBAR HEADER ---
 st.sidebar.markdown(
@@ -96,16 +111,7 @@ with st.sidebar.expander("🧬 Other Tests", expanded=False):
 
 # --- RESET BUTTON ---
 if st.sidebar.button("🔄 Reset All Inputs"):
-    # Reset dictionary values
-    for key in list(st.session_state.user_input.keys()):
-        st.session_state.user_input[key] = "Unknown"
-    # Reset actual widget keys too
-    for key in list(st.session_state.keys()):
-        if key not in ["user_input", "results"]:
-            if isinstance(st.session_state[key], list):
-                st.session_state[key] = []  # for multiselects
-            else:
-                st.session_state[key] = "Unknown"  # for selectboxes/textboxes
+    st.session_state["reset_trigger"] = True
     st.rerun()
 
 # --- IDENTIFY BUTTON ---
@@ -192,5 +198,4 @@ if not st.session_state.results.empty:
 
 # --- FOOTER ---
 st.markdown("<hr>", unsafe_allow_html=True)
-st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | Powered by BactAI-D</div>", unsafe_allow_html=True)
-
+st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | Powered by BactAI-d</div>", unsafe_allow_html=True)
