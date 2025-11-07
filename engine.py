@@ -2,6 +2,7 @@ import pandas as pd
 import re
 import random
 
+
 class IdentificationResult:
     def __init__(self, genus, total_score, matched_fields, mismatched_fields, reasoning_factors, extra_notes=""):
         self.genus = genus
@@ -12,14 +13,12 @@ class IdentificationResult:
         self.extra_notes = extra_notes
 
     def confidence_percent(self):
-        """Convert raw score to 0–100 confidence scale."""
-        # Assume 30 max differentiating fields gives roughly 15 meaningful points.
-        # Normalize and bound between 0–100.
+        """Return a confidence % score based on total matches."""
         normalized = max(0, min(100, int((self.total_score / 15) * 100)))
         return normalized
 
     def confidence_colour(self):
-        """Assign a colour label based on confidence."""
+        """Convert confidence to qualitative color level."""
         val = self.confidence_percent()
         if val >= 75:
             return "🟩 High"
@@ -30,15 +29,8 @@ class IdentificationResult:
         else:
             return "🟥 Very Low"
 
-    def next_test_suggestion(self):
-        """Suggest one next test to help differentiate."""
-        if not self.mismatched_fields:
-            return "All observed characteristics align. No further tests required."
-        next_test = random.choice(self.mismatched_fields)
-        return f"Perform or review **{next_test}** to confirm identification."
-
     def reasoning_paragraph(self):
-        """Generate a natural-language reasoning paragraph."""
+        """Generate a natural-language explanation of why this genus was chosen."""
         if not self.matched_fields:
             return "No significant biochemical or morphological matches were found."
 
@@ -64,12 +56,7 @@ class IdentificationResult:
         summary = " ".join(highlights)
         confidence = f"The confidence in this identification is **{self.confidence_colour()}**."
 
-        suggestion = ""
-        if len(self.mismatched_fields) > 0:
-            next_test = random.choice(self.mismatched_fields)
-            suggestion = f" To further confirm this identification, it is recommended to perform or review the **{next_test}** test."
-
-        return f"{intro} {summary}, the isolate most closely resembles **{self.genus}**. {confidence}{suggestion}"
+        return f"{intro} {summary}, the isolate most closely resembles **{self.genus}**. {confidence}"
 
 
 class BacteriaIdentifier:
@@ -77,24 +64,23 @@ class BacteriaIdentifier:
         self.db = db.fillna("")
 
     def compare_field(self, db_val, user_val, field_name):
-        """Compares one field between database and user input, returning match score."""
+        """Compare a database field with user input, returning a match score."""
         if not user_val or str(user_val).strip() == "" or user_val.lower() == "unknown":
-            return 0  # no data provided
+            return 0
 
         db_val = str(db_val).strip()
         user_val = str(user_val).strip()
 
         hard_exclusions = ["Gram Stain", "Shape", "Spore Formation"]
 
-        # Split entries for multi-value comparison
         db_options = [x.strip().lower() for x in re.split(r"[;/]", db_val) if x.strip()]
         user_options = [x.strip().lower() for x in re.split(r"[;/]", user_val) if x.strip()]
 
-        # Variable handling: don't exclude based on "variable"
+        # If either is variable, skip exclusion
         if "variable" in db_options or "variable" in user_options:
             return 0
 
-        # Special case: temperature range
+        # Temperature special handling
         if field_name == "Growth Temperature":
             try:
                 if "//" in db_val:
@@ -104,14 +90,10 @@ class BacteriaIdentifier:
             except:
                 return 0
 
-        # Case-insensitive, partial matching
-        match_found = any(
-            u == d or u in d or d in u
-            for u in user_options
-            for d in db_options
-        )
+        # Normal comparison
+        match_found = any(u == d or u in d or d in u for u in user_options for d in db_options)
 
-        # Hard exclusion logic
+        # Apply hard exclusion logic
         if field_name in hard_exclusions:
             if not match_found and "variable" not in db_options:
                 return -999
@@ -121,7 +103,7 @@ class BacteriaIdentifier:
         return 1 if match_found else -1
 
     def identify(self, user_input):
-        """Main identification logic."""
+        """Main bacterial identification logic."""
         results = []
 
         for _, row in self.db.iterrows():
@@ -142,7 +124,7 @@ class BacteriaIdentifier:
 
                 if score == -999:
                     total_score = -999
-                    break  # hard exclusion
+                    break
                 elif score == 1:
                     total_score += 1
                     matched_fields.append(field)
@@ -154,27 +136,42 @@ class BacteriaIdentifier:
             if total_score > -999:
                 extra_notes = row.get("Extra Notes", "")
                 result = IdentificationResult(
-                    genus,
-                    total_score,
-                    matched_fields,
-                    mismatched_fields,
-                    reasoning_factors,
-                    extra_notes
+                    genus, total_score, matched_fields, mismatched_fields, reasoning_factors, extra_notes
                 )
                 results.append(result)
 
-        # Sort by total_score descending
+        # Sort descending by total score
         results.sort(key=lambda x: x.total_score, reverse=True)
 
-        # Convert to dataframe format expected by app
+        # --- Smart Next Step Suggestion ---
+        if results:
+            top_genera = [r.genus for r in results[:10]]
+            unknown_fields = [f for f, v in user_input.items() if v.lower() == "unknown" or v.strip() == ""]
+
+            variation_scores = {}
+            for field in unknown_fields:
+                unique_vals = set()
+                for _, row in self.db[self.db["Genus"].isin(top_genera)].iterrows():
+                    unique_vals.update(re.split(r"[;/]", str(row.get(field, "")).strip().lower()))
+                variation_scores[field] = len(unique_vals)
+
+            best_field = max(variation_scores, key=variation_scores.get) if variation_scores else None
+        else:
+            best_field = None
+
+        # --- Final structured results ---
         data = []
         for r in results[:10]:
+            suggestion = (
+                f"Perform **{best_field}** to help confirm between likely options."
+                if best_field else "All key differentiators have been tested."
+            )
             data.append({
                 "Genus": r.genus,
                 "Confidence (%)": r.confidence_percent(),
                 "Confidence Level": r.confidence_colour(),
-                "AI Reasoning": r.reasoning_paragraph(),
-                "Next Test Suggestion": r.next_test_suggestion(),
+                "Reasoning": r.reasoning_paragraph(),
+                "Next Step Suggestion": suggestion,
                 "Extra Notes": r.extra_notes
             })
 
