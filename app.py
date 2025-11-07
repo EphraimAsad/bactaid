@@ -96,8 +96,16 @@ with st.sidebar.expander("🧬 Other Tests", expanded=False):
 
 # --- RESET BUTTON ---
 if st.sidebar.button("🔄 Reset All Inputs"):
+    # Reset dictionary values
     for key in list(st.session_state.user_input.keys()):
         st.session_state.user_input[key] = "Unknown"
+    # Reset actual widget keys too
+    for key in list(st.session_state.keys()):
+        if key not in ["user_input", "results"]:
+            if isinstance(st.session_state[key], list):
+                st.session_state[key] = []  # for multiselects
+            else:
+                st.session_state[key] = "Unknown"  # for selectboxes/textboxes
     st.rerun()
 
 # --- IDENTIFY BUTTON ---
@@ -185,3 +193,4 @@ if not st.session_state.results.empty:
 # --- FOOTER ---
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | Powered by BactAI-D</div>", unsafe_allow_html=True)
+
