@@ -35,7 +35,7 @@ def load_data():
 db = load_data()
 eng = BacteriaIdentifier(db)
 
-# --- TITLE ---
+# --- PAGE TITLE ---
 st.title("🧫 BactAI-D: Intelligent Bacteria Identification Assistant")
 st.markdown("Use the sidebar to input your biochemical and morphological results.")
 
@@ -57,6 +57,7 @@ st.sidebar.markdown(
 
 # --- HELPER FUNCTION ---
 def get_unique_values(field):
+    """Extract all unique field values from the Excel dataset."""
     vals = []
     for v in eng.db[field]:
         parts = re.split(r"[;/]", str(v))
@@ -140,6 +141,7 @@ if st.sidebar.button("🔄 Reset All Inputs"):
 if st.sidebar.button("🔍 Identify"):
     with st.spinner("Analyzing results..."):
         results = eng.identify(st.session_state.user_input)
+
         if not results:
             st.error("No matches found. Try adjusting your inputs.")
         else:
@@ -147,43 +149,46 @@ if st.sidebar.button("🔍 Identify"):
                 [
                     [
                         r.genus,
-                        f"{max(0, min(100, int((r.total_score / 30) * 100)))}%",
+                        f"{r.confidence_percent()}%",
+                        f"{r.true_confidence()}%",
                         r.reasoning_paragraph(),
-                        ", ".join(r.mismatched_fields),
-                        r.extra_notes,
+                        r.extra_notes
                     ]
                     for r in results
                 ],
                 columns=[
                     "Genus",
                     "Confidence",
+                    "True Confidence (All Tests)",
                     "Reasoning",
-                    "Next Step Suggestion",
-                    "Extra Notes",
+                    "Extra Notes"
                 ],
             )
             st.session_state.results = results
 
 # --- DISPLAY RESULTS ---
 if not st.session_state.results.empty:
+    st.info("Percentages based upon options entered. True confidence percentage shown within each expanded result.")
+
     st.success("Top Possible Matches:")
     for _, row in st.session_state.results.iterrows():
+        confidence_value = int(row["Confidence"].replace("%", ""))
         confidence_color = (
-            "🟢" if int(row["Confidence"].replace("%", "")) >= 75
-            else "🟡" if int(row["Confidence"].replace("%", "")) >= 50
-            else "🔴"
+            "🟢" if confidence_value >= 75 else
+            "🟡" if confidence_value >= 50 else
+            "🔴"
         )
+
         header = f"**{row['Genus']}** — {confidence_color} {row['Confidence']}"
         with st.expander(header):
             st.markdown(f"**Reasoning:** {row['Reasoning']}")
-            st.markdown(f"**Next Step:** {row['Next Step Suggestion']}")
+            st.markdown(f"**True Confidence (All Tests):** {row['True Confidence (All Tests)']}")
             if row["Extra Notes"]:
                 st.markdown(f"**Notes:** {row['Extra Notes']}")
 
 # --- FOOTER ---
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
-    "<div style='text-align: center; font-size: 14px;'>Created by <b>Zain</b> | Powered by BactAI-d</div>",
+    "<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | Powered by BactAI-d</div>",
     unsafe_allow_html=True
 )
-
