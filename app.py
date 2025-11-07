@@ -11,7 +11,7 @@ st.set_page_config(page_title="BactAI-d Assistant", layout="wide")
 
 # --- CONSTANTS ---
 SUGAR_FIELDS = [
-    "Glucose Fermentation",
+    "Glucose Fermantation",
     "Lactose Fermentation",
     "Sucrose Fermentation",
     "Maltose Fermentation",
@@ -191,3 +191,4 @@ st.markdown(
     "<div style='text-align: center; font-size: 14px;'>Created by <b>Zain</b> | Powered by BactAI-d</div>",
     unsafe_allow_html=True
 )
+
