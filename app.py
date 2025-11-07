@@ -7,8 +7,8 @@ from datetime import datetime
 from engine import BacteriaIdentifier
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="BactAI-D Assistant", layout="wide")
-st.title("🧫 BactAI-D — Intelligent Bacterial Identification Assistant")
+st.set_page_config(page_title="BactAI-d Assistant", layout="wide")
+st.title("🧫 BactAI-d — Intelligent Bacterial Identification Assistant")
 
 # --- LOAD DATABASE ---
 @st.cache_data
@@ -78,6 +78,7 @@ def confidence_gradient(conf_pct):
 
 # --- SMART NEXT STEP FUNCTION ---
 def suggest_next_tests(user_input, db, top_results):
+    """Suggest which unknown tests would most differentiate top candidates."""
     if len(top_results) < 2:
         return "All known fields already consistent. No further differentiation required."
 
@@ -105,9 +106,9 @@ def suggest_next_tests(user_input, db, top_results):
     best_field = max(field_variability, key=field_variability.get)
     return f"Perform or review the **{best_field}** test to further differentiate among top candidates."
 
-# --- COMPARATIVE REASONING FUNCTION ---
+# --- COMPARATIVE REASONING FUNCTION (GRAMMATICALLY POLISHED) ---
 def generate_reasoning(main_row, second_row, user_input):
-    """Describe how the top genus differs from the runner-up based on key traits."""
+    """Describe how the top genus differs from the runner-up, with natural phrasing."""
     genus1 = main_row["Genus"]
     genus2 = second_row["Genus"]
     differences = []
@@ -118,14 +119,21 @@ def generate_reasoning(main_row, second_row, user_input):
         db_val1 = str(db.loc[db["Genus"] == genus1, field].values[0]) if not db.loc[db["Genus"] == genus1].empty else ""
         db_val2 = str(db.loc[db["Genus"] == genus2, field].values[0]) if not db.loc[db["Genus"] == genus2].empty else ""
         if db_val1.lower() != db_val2.lower():
-            differences.append(field)
+            differences.append(field.lower())
 
     if not differences:
         return f"The biochemical profile matches **{genus1}** closely, showing minimal distinction from {genus2}."
 
-    key_fields = ", ".join(differences[:3])
+    # --- Grammar fix for 'and' before last element ---
+    if len(differences) == 1:
+        formatted_diffs = differences[0]
+    elif len(differences) == 2:
+        formatted_diffs = " and ".join(differences)
+    else:
+        formatted_diffs = ", ".join(differences[:-1]) + f", and {differences[-1]}"
+
     return (f"The isolate aligns best with **{genus1}**, differing from *{genus2}* primarily in "
-            f"{key_fields.lower()}. These results support identification as **{genus1}**.")
+            f"{formatted_diffs}. These results support identification as **{genus1}**.")
 
 # --- DISPLAY RESULTS ---
 if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.results.empty:
@@ -164,6 +172,7 @@ def safe_text(s):
     return str(s).encode('latin-1', 'replace').decode('latin-1')
 
 def export_pdf(df, user_input):
+    """Export results as a well-formatted PDF with grammatical reasoning."""
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", size=11)
@@ -182,10 +191,12 @@ def export_pdf(df, user_input):
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(0, 8, safe_text(f"{row['Genus']} — {row['Confidence Level']} ({row['Confidence (%)']}%)"), ln=True)
         pdf.set_font("Helvetica", size=10)
+
         if i == 0 and len(df) > 1:
             reasoning = generate_reasoning(row, df.iloc[1], user_input)
         else:
             reasoning = row["Reasoning"]
+
         pdf.multi_cell(0, 8, safe_text(f"Reasoning: {reasoning}"))
         next_step = suggest_next_tests(user_input, db, df.head(5))
         pdf.multi_cell(0, 8, safe_text(f"Next Step: {next_step}"))
