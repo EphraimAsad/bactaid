@@ -29,8 +29,9 @@ if "user_input" not in st.session_state:
 if "results" not in st.session_state:
     st.session_state.results = pd.DataFrame()
 
-# --- INPUT FORM ---
+# --- SIDEBAR INPUTS ---
 st.sidebar.header("Input Biochemical & Morphological Results")
+
 for field in eng.db.columns:
     if field == "Genus":
         continue
@@ -44,56 +45,41 @@ for field in eng.db.columns:
                     all_vals.append(clean)
         all_vals.sort()
         st.session_state.user_input[field] = st.sidebar.selectbox(
-            field, ["Unknown"] + all_vals
+            field,
+            ["Unknown"] + all_vals,
+            key=field
         )
     elif field == "Growth Temperature":
-        st.session_state.user_input[field] = st.sidebar.text_input(field, "")
+        st.session_state.user_input[field] = st.sidebar.text_input(field, "", key=field)
     else:
         st.session_state.user_input[field] = st.sidebar.selectbox(
-            field, ["Unknown", "Positive", "Negative", "Variable"]
+            field, ["Unknown", "Positive", "Negative", "Variable"], key=field
         )
 
 # --- RESET BUTTON ---
 if st.sidebar.button("🔄 Reset All Inputs"):
-    for k in st.session_state.user_input.keys():
-        st.session_state.user_input[k] = "Unknown"
-    st.rerun()  # Updated for modern Streamlit
+    for key in list(st.session_state.user_input.keys()):
+        st.session_state.user_input[key] = "Unknown"
+        st.session_state[key] = "Unknown"
+    st.rerun()
 
 # --- IDENTIFY BUTTON ---
 if st.sidebar.button("🔍 Identify"):
     with st.spinner("Analyzing results..."):
         results = eng.identify(st.session_state.user_input)
-        if isinstance(results, list):
-            try:
-                results = pd.DataFrame(results, columns=["Genus", "Confidence (%)"])
-            except:
-                results = pd.DataFrame()
         st.session_state.results = results
-
-# --- COLOUR MAPPING FUNCTION ---
-def color_confidence(val):
-    if isinstance(val, str):
-        if "High" in val:
-            return "background-color: #b5e7a0"  # green
-        elif "Moderate" in val:
-            return "background-color: #fff5ba"  # yellow
-        elif "Low" in val:
-            return "background-color: #ffd6a5"  # orange
-        else:
-            return "background-color: #f8a5a5"  # red
-    return ""
 
 # --- DISPLAY RESULTS ---
 if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.results.empty:
-    st.success("Top Possible Matches:")
+    st.success("### Top Possible Matches:")
 
-    # Summary table
-    styled_table = st.session_state.results.style.applymap(color_confidence, subset=["Confidence Level"])
-    st.dataframe(styled_table, use_container_width=True)
+    for idx, row in st.session_state.results.iterrows():
+        # Clean heading line
+        genus = row["Genus"]
+        conf_pct = row["Confidence (%)"]
+        conf_lvl = row["Confidence Level"]
 
-    # Expanders with reasoning and next steps
-    for _, row in st.session_state.results.iterrows():
-        header = f"**{row['Genus']}** — {row['Confidence Level']} ({row['Confidence (%)']}%)"
+        header = f"**{idx+1}. {genus}** — {conf_lvl} ({conf_pct}%)"
         with st.expander(header):
             st.markdown(f"**Reasoning:** {row['Reasoning']}")
             st.markdown(f"**Next Step:** {row['Next Step Suggestion']}")
@@ -101,9 +87,9 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
                 st.markdown(f"**Notes:** {row['Extra Notes']}")
 
 else:
-    st.warning("Enter results and click **Identify** to begin analysis.")
+    st.info("Enter your results on the left and click **Identify** to begin analysis.")
 
-# --- PDF EXPORT SECTION ---
+# --- PDF EXPORT ---
 
 def safe_text(s):
     """Ensure unicode characters are encoded safely for PDF output."""
@@ -139,7 +125,7 @@ def export_pdf(df, user_input):
     pdf.output(output_path)
     return output_path
 
-# --- PDF BUTTON ---
+# --- PDF DOWNLOAD ---
 if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.results.empty:
     if st.button("📄 Export Results to PDF"):
         pdf_path = export_pdf(st.session_state.results, st.session_state.user_input)
