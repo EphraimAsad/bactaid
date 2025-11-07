@@ -65,11 +65,13 @@ if "results" not in st.session_state:
 
 # --- SIDEBAR ---
 st.sidebar.markdown(
-    "<div style='background-color:#E3F2FD; padding:10px; border-radius:8px;'>"
-    "<h3 style='text-align:center;'>🔬 Input Test Results</h3></div>",
+    """
+    <div style='background-color:#1565C0; padding:12px; border-radius:10px;'>
+        <h3 style='text-align:center; color:white; margin:0;'>🔬 Input Test Results</h3>
+    </div>
+    """,
     unsafe_allow_html=True
 )
-
 # ------------------------
 # SECTION 1: MORPHOLOGICAL TESTS
 # ------------------------
@@ -237,3 +239,4 @@ st.markdown(
     "<div style='text-align: center; font-size: 14px;'>Created by <b>Zain</b> | Powered by BactAI-D</div>",
     unsafe_allow_html=True
 )
+
