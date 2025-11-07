@@ -7,7 +7,7 @@ from datetime import datetime
 from engine import BacteriaIdentifier
 
 # --- CONFIG ---
-st.set_page_config(page_title="BactAI-d Assistant", layout="wide")
+st.set_page_config(page_title="BactAI-D Assistant", layout="wide")
 
 # --- LOAD DATA ---
 @st.cache_data
@@ -21,7 +21,7 @@ db = load_data()
 eng = BacteriaIdentifier(db)
 
 # --- PAGE HEADER ---
-st.title("🧫 BactAI-d: Intelligent Bacteria Identification Assistant")
+st.title("🧫 BactAI-D: Intelligent Bacteria Identification Assistant")
 st.markdown("Use the sidebar to input your biochemical and morphological results.")
 
 # --- FIELD GROUPS ---
@@ -198,4 +198,5 @@ if not st.session_state.results.empty:
 
 # --- FOOTER ---
 st.markdown("<hr>", unsafe_allow_html=True)
-st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | Powered by BactAI-d</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | Powered by BactAI-D</div>", unsafe_allow_html=True)
+
