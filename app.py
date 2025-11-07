@@ -76,6 +76,41 @@ def confidence_gradient(conf_pct):
     green = int(conf_pct * 2.55)
     return f"rgb({red},{green},60)"  # warm tone gradient
 
+# --- SMART NEXT STEP FUNCTION ---
+def suggest_next_tests(user_input, db, top_results):
+    """
+    Suggest which unknown tests would most differentiate the top candidates.
+    Excludes 'Extra Notes' and 'Colony Morphology'.
+    """
+    if len(top_results) < 2:
+        return "All known fields already consistent. No further differentiation required."
+
+    top_genera = [r["Genus"] for _, r in top_results.iterrows()]
+    subset = db[db["Genus"].isin(top_genera)]
+
+    unknown_fields = [k for k, v in user_input.items() if v == "Unknown"
+                      and k not in ["Extra Notes", "Colony Morphology"]]
+
+    if not unknown_fields:
+        return "No untested fields available for further differentiation."
+
+    # Calculate which unknown field varies most across top genera
+    field_variability = {}
+    for field in unknown_fields:
+        unique_vals = set()
+        for v in subset[field]:
+            for val in re.split(r"[;/]", str(v)):
+                if val.strip():
+                    unique_vals.add(val.strip().lower())
+        field_variability[field] = len(unique_vals)
+
+    if not field_variability:
+        return "No further key differentiating tests identified."
+
+    # Pick the most variable field as the best next step
+    best_field = max(field_variability, key=field_variability.get)
+    return f"Perform or review the **{best_field}** test to further differentiate among top candidates."
+
 # --- DISPLAY RESULTS ---
 if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.results.empty:
     st.success("### Top Possible Matches:")
@@ -84,7 +119,6 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
         genus = row["Genus"]
         conf_pct = float(row["Confidence (%)"])
         conf_lvl = row["Confidence Level"]
-
         color = confidence_gradient(conf_pct)
 
         # Header with gradient badge
@@ -97,11 +131,8 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
 
         with st.expander("Details & Reasoning"):
             st.markdown(f"**Reasoning:** {row['Reasoning']}")
-            # Filter Next Step suggestions (remove irrelevant ones)
-            suggestion = row['Next Step Suggestion']
-            if any(x in suggestion for x in ["Extra Notes", "Colony Morphology"]):
-                suggestion = "No further key differentiating tests identified."
-            st.markdown(f"**Next Step:** {suggestion}")
+            next_step = suggest_next_tests(st.session_state.user_input, db, st.session_state.results.head(5))
+            st.markdown(f"**Next Step:** {next_step}")
             if row['Extra Notes']:
                 st.markdown(f"**Notes:** {row['Extra Notes']}")
 
@@ -134,10 +165,8 @@ def export_pdf(df, user_input):
         pdf.cell(0, 8, safe_text(f"{row['Genus']} — {row['Confidence Level']} ({row['Confidence (%)']}%)"), ln=True)
         pdf.set_font("Helvetica", size=10)
         pdf.multi_cell(0, 8, safe_text(f"Reasoning: {row['Reasoning']}"))
-        suggestion = row['Next Step Suggestion']
-        if any(x in suggestion for x in ["Extra Notes", "Colony Morphology"]):
-            suggestion = "No further key differentiating tests identified."
-        pdf.multi_cell(0, 8, safe_text(f"Next Step: {suggestion}"))
+        next_step = suggest_next_tests(user_input, db, df.head(5))
+        pdf.multi_cell(0, 8, safe_text(f"Next Step: {next_step}"))
         if row['Extra Notes']:
             pdf.multi_cell(0, 8, safe_text(f"Notes: {row['Extra Notes']}"))
         pdf.ln(4)
