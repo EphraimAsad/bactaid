@@ -3,16 +3,30 @@ import re
 import random
 
 class IdentificationResult:
-    def __init__(self, genus, total_score, matched_fields, mismatched_fields, reasoning_factors, extra_notes=""):
+    def __init__(self, genus, total_score, matched_fields, mismatched_fields, reasoning_factors, total_fields_evaluated, total_fields_possible, extra_notes=""):
         self.genus = genus
         self.total_score = total_score
         self.matched_fields = matched_fields
         self.mismatched_fields = mismatched_fields
         self.reasoning_factors = reasoning_factors
+        self.total_fields_evaluated = total_fields_evaluated
+        self.total_fields_possible = total_fields_possible
         self.extra_notes = extra_notes
 
+    def confidence_percent(self):
+        """Confidence based on fields entered"""
+        if self.total_fields_evaluated == 0:
+            return 0
+        return max(0, min(100, int((self.total_score / self.total_fields_evaluated) * 100)))
+
+    def true_confidence(self):
+        """Confidence based on all possible tests"""
+        if self.total_fields_possible == 0:
+            return 0
+        return max(0, min(100, int((self.total_score / self.total_fields_possible) * 100)))
+
     def reasoning_paragraph(self):
-        """Generate a natural-language explanation of why this genus was chosen."""
+        """Generate natural reasoning explanation."""
         if not self.matched_fields:
             return "No significant biochemical or morphological matches were found."
 
@@ -40,18 +54,15 @@ class IdentificationResult:
         else:
             summary = "".join(highlights)
 
-        confidence = (
-            "The confidence in this identification is high."
-            if self.total_score >= 6 else
-            "The confidence in this identification is moderate."
-        )
+        confidence_text = "The confidence in this identification is high." if self.confidence_percent() >= 70 else "The confidence in this identification is moderate."
 
+        # --- Suggest next 3 differentiation tests ---
+        next_tests = random.sample(self.mismatched_fields, min(3, len(self.mismatched_fields))) if self.mismatched_fields else []
         suggestion = ""
-        if self.mismatched_fields:
-            next_test = random.choice(self.mismatched_fields)
-            suggestion = f" To confirm this identification, consider performing or reviewing the **{next_test}** test."
+        if next_tests:
+            suggestion = f" To further differentiate, consider performing: **{', '.join(next_tests)}**."
 
-        return f"{intro} {summary}, the isolate most closely resembles **{self.genus}**. {confidence}{suggestion}"
+        return f"{intro} {summary}, the isolate most closely resembles **{self.genus}**. {confidence_text}{suggestion}"
 
 
 class BacteriaIdentifier:
@@ -59,27 +70,23 @@ class BacteriaIdentifier:
         self.db = db.fillna("")
 
     def compare_field(self, db_val, user_val, field_name):
-        """Compare one field between database and user input, returning match score."""
-        if not user_val or str(user_val).strip() == "":
-            return 0  # no data provided
+        """Compare field and return score."""
+        if not user_val or str(user_val).strip() == "" or user_val.lower() == "unknown":
+            return 0
 
         db_val = str(db_val).strip().lower()
         user_val = str(user_val).strip().lower()
-
-        # Hard exclusion fields
         hard_exclusions = ["Gram Stain", "Shape", "Spore Formation"]
 
-        # Split multi-value fields into options
         db_options = re.split(r"[;/]", db_val)
         user_options = re.split(r"[;/]", user_val)
         db_options = [x.strip() for x in db_options if x.strip()]
         user_options = [x.strip() for x in user_options if x.strip()]
 
-        # Variable logic
         if "variable" in db_options or "variable" in user_options:
             return 0
 
-        # Growth temperature check
+        # Temperature special logic
         if field_name == "Growth Temperature":
             try:
                 if "//" in db_val:
@@ -89,26 +96,29 @@ class BacteriaIdentifier:
             except:
                 return 0
 
-        # --- Matching logic: partial overlap counts as match ---
-        match_found = any(u in db_options or any(u in db_opt for db_opt in db_options) for u in user_options)
+        # --- Partial overlap logic ---
+        match_found = any(
+            any(u in db_opt or db_opt in u for db_opt in db_options)
+            for u in user_options
+        )
 
         if match_found:
             return 1
         else:
             if field_name in hard_exclusions:
-                return -999  # Hard exclude
+                return -999
             return -1
 
     def identify(self, user_input):
-        """Main identification logic."""
+        """Run identification."""
         results = []
+        total_fields_possible = len([c for c in self.db.columns if c != "Genus"])
 
         for _, row in self.db.iterrows():
             genus = row["Genus"]
             total_score = 0
-            matched_fields = []
-            mismatched_fields = []
-            reasoning_factors = {}
+            matched_fields, mismatched_fields, reasoning_factors = [], [], {}
+            total_fields_evaluated = 0
 
             for field in self.db.columns:
                 if field == "Genus":
@@ -118,10 +128,12 @@ class BacteriaIdentifier:
                 user_val = user_input.get(field, "")
 
                 score = self.compare_field(db_val, user_val, field)
+                if user_val and user_val.lower() != "unknown":
+                    total_fields_evaluated += 1
 
                 if score == -999:
                     total_score = -999
-                    break  # Hard exclusion stops consideration
+                    break
                 elif score == 1:
                     total_score += 1
                     matched_fields.append(field)
@@ -133,9 +145,11 @@ class BacteriaIdentifier:
             if total_score > -999:
                 extra_notes = row.get("Extra Notes", "")
                 results.append(
-                    IdentificationResult(genus, total_score, matched_fields, mismatched_fields, reasoning_factors, extra_notes)
+                    IdentificationResult(
+                        genus, total_score, matched_fields, mismatched_fields,
+                        reasoning_factors, total_fields_evaluated, total_fields_possible, extra_notes
+                    )
                 )
 
-        # Sort by total score descending
         results.sort(key=lambda x: x.total_score, reverse=True)
         return results[:10]
