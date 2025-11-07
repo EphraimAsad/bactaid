@@ -7,8 +7,8 @@ from datetime import datetime
 from engine import BacteriaIdentifier
 
 # --- CONFIG ---
-st.set_page_config(page_title="BactAI-d Assistant", layout="wide")
-st.title("🧫 BactAI-d — Intelligent Bacterial Identification Assistant")
+st.set_page_config(page_title="BactAI-D Assistant", layout="wide")
+st.title("🧫 BactAI-D — Intelligent Bacterial Identification Assistant")
 
 # --- LOAD DATABASE ---
 @st.cache_data
@@ -131,3 +131,4 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
         pdf_path = export_pdf(st.session_state.results, st.session_state.user_input)
         with open(pdf_path, "rb") as f:
             st.download_button("⬇️ Download PDF", f, file_name="BactAI-D_Report.pdf")
+
