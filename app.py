@@ -7,9 +7,26 @@ from datetime import datetime
 from engine import BacteriaIdentifier
 
 # --- CONFIG ---
-st.set_page_config(page_title="BactAI-d Assistant", layout="wide")
+st.set_page_config(page_title="BactAI-D Assistant", layout="wide")
 
-# --- CONSTANTS ---
+# --- FIELD GROUPS ---
+MORPH_FIELDS = [
+    "Gram Stain",
+    "Shape",
+    "Colony Morphology",
+    "Media Grown On",
+    "Motility",
+    "Capsule",
+    "Spore Formation"
+]
+
+ENZYME_FIELDS = [
+    "Catalase",
+    "Oxidase",
+    "Coagulase",
+    "Lipase Test"
+]
+
 SUGAR_FIELDS = [
     "Glucose Fermantation",
     "Lactose Fermentation",
@@ -25,19 +42,12 @@ SUGAR_FIELDS = [
     "Inositol Fermentation"
 ]
 
-ENZYME_FIELDS = [
-    "Catalase",
-    "Oxidase",
-    "Coagulase",
-    "Lipase Test"
-]
-
 # --- LOAD DATABASE ---
 @st.cache_data
 def load_data():
     data_path = os.path.join("bacteria_db.xlsx")
     df = pd.read_excel(data_path)
-    df.columns = [c.strip() for c in df.columns]  # Trim any stray spaces
+    df.columns = [c.strip() for c in df.columns]  # trim stray spaces
     return df
 
 db = load_data()
@@ -47,67 +57,90 @@ eng = BacteriaIdentifier(db)
 st.title("🧫 BactAI-d: Intelligent Bacteria Identification Assistant")
 st.markdown("Use the sidebar to input your biochemical and morphological results.")
 
-# --- INITIALIZE SESSION STATE ---
+# --- SESSION STATE ---
 if "user_input" not in st.session_state:
     st.session_state.user_input = {}
 if "results" not in st.session_state:
     st.session_state.results = pd.DataFrame()
 
-# --- SIDEBAR INPUTS ---
-st.sidebar.header("🔬 Input Test Results")
+# --- SIDEBAR ---
+st.sidebar.markdown(
+    "<div style='background-color:#E3F2FD; padding:10px; border-radius:8px;'>"
+    "<h3 style='text-align:center;'>🔬 Input Test Results</h3></div>",
+    unsafe_allow_html=True
+)
 
-# --- Carbohydrate Fermentation Section ---
-st.sidebar.markdown("### 🍬 Carbohydrate Fermentation Tests")
-for field in SUGAR_FIELDS:
-    if field in eng.db.columns:
-        st.session_state.user_input[field] = st.sidebar.selectbox(
-            field,
-            ["Unknown", "Positive", "Negative", "Variable"],
-            index=0,
-            key=field
-        )
+# ------------------------
+# SECTION 1: MORPHOLOGICAL TESTS
+# ------------------------
+with st.sidebar.expander("🧫 Morphological Tests", expanded=True):
+    for field in MORPH_FIELDS:
+        if field not in eng.db.columns:
+            continue
 
-# --- Enzyme Test Section ---
-st.sidebar.markdown("### 🧪 Enzyme Tests")
-for field in ENZYME_FIELDS:
-    if field in eng.db.columns:
-        st.session_state.user_input[field] = st.sidebar.selectbox(
-            field,
-            ["Unknown", "Positive", "Negative", "Variable"],
-            index=0,
-            key=field
-        )
+        if field in ["Colony Morphology", "Media Grown On", "Shape"]:
+            all_vals = []
+            for v in eng.db[field]:
+                parts = re.split(r"[;/]", str(v))
+                for p in parts:
+                    clean = p.strip()
+                    if clean and clean not in all_vals:
+                        all_vals.append(clean)
+            all_vals.sort()
+            st.session_state.user_input[field] = st.selectbox(
+                field, ["Unknown"] + all_vals, index=0, key=field
+            )
+        else:
+            st.session_state.user_input[field] = st.selectbox(
+                field, ["Unknown", "Positive", "Negative", "Variable"], index=0, key=field
+            )
 
-# --- All Other Fields ---
-st.sidebar.markdown("### 🧬 Other Tests")
-for field in eng.db.columns:
-    if field in ["Genus"] + SUGAR_FIELDS + ENZYME_FIELDS:
-        continue
+# ------------------------
+# SECTION 2: ENZYME TESTS
+# ------------------------
+with st.sidebar.expander("🧪 Enzyme Tests", expanded=False):
+    for field in ENZYME_FIELDS:
+        if field in eng.db.columns:
+            st.session_state.user_input[field] = st.selectbox(
+                field, ["Unknown", "Positive", "Negative", "Variable"], index=0, key=field
+            )
 
-    # special dropdowns for multi-option fields
-    if field in ["Colony Morphology", "Media Grown On", "Oxygen Requirement", "Shape", "Haemolysis Type"]:
-        all_vals = []
-        for v in eng.db[field]:
-            parts = re.split(r"[;/]", str(v))
-            for p in parts:
-                clean = p.strip()
-                if clean and clean not in all_vals:
-                    all_vals.append(clean)
-        all_vals.sort()
-        st.session_state.user_input[field] = st.sidebar.selectbox(
-            field, ["Unknown"] + all_vals, index=0, key=field
-        )
-    elif field == "Growth Temperature":
-        st.session_state.user_input[field] = st.sidebar.text_input(
-            field + " (°C)", "", key=field
-        )
-    else:
-        st.session_state.user_input[field] = st.sidebar.selectbox(
-            field,
-            ["Unknown", "Positive", "Negative", "Variable"],
-            index=0,
-            key=field
-        )
+# ------------------------
+# SECTION 3: CARBOHYDRATE FERMENTATION TESTS
+# ------------------------
+with st.sidebar.expander("🍬 Carbohydrate Fermentation Tests", expanded=False):
+    for field in SUGAR_FIELDS:
+        if field in eng.db.columns:
+            st.session_state.user_input[field] = st.selectbox(
+                field, ["Unknown", "Positive", "Negative", "Variable"], index=0, key=field
+            )
+
+# ------------------------
+# SECTION 4: OTHER TESTS
+# ------------------------
+with st.sidebar.expander("🧬 Other Tests", expanded=False):
+    for field in eng.db.columns:
+        if field in ["Genus"] + MORPH_FIELDS + ENZYME_FIELDS + SUGAR_FIELDS:
+            continue
+
+        if field == "Haemolysis Type":
+            all_vals = []
+            for v in eng.db[field]:
+                parts = re.split(r"[;/]", str(v))
+                for p in parts:
+                    clean = p.strip()
+                    if clean and clean not in all_vals:
+                        all_vals.append(clean)
+            all_vals.sort()
+            st.session_state.user_input[field] = st.selectbox(
+                field, ["Unknown"] + all_vals, index=0, key=field
+            )
+        elif field == "Growth Temperature":
+            st.session_state.user_input[field] = st.text_input(field + " (°C)", "", key=field)
+        else:
+            st.session_state.user_input[field] = st.selectbox(
+                field, ["Unknown", "Positive", "Negative", "Variable"], index=0, key=field
+            )
 
 # --- RESET BUTTON ---
 if st.sidebar.button("🔄 Reset All Inputs"):
@@ -120,11 +153,24 @@ if st.sidebar.button("🔍 Identify"):
     with st.spinner("Analyzing results..."):
         results = eng.identify(st.session_state.user_input)
         if isinstance(results, list):
-            import pandas as pd
             results = pd.DataFrame(
-                [[r.genus, f"{max(0, min(100, int((r.total_score / 30) * 100)))}%", r.reasoning_paragraph(), ", ".join(r.mismatched_fields), r.extra_notes]
-                 for r in results],
-                columns=["Genus", "Confidence", "Reasoning", "Next Step Suggestion", "Extra Notes"]
+                [
+                    [
+                        r.genus,
+                        f"{max(0, min(100, int((r.total_score / 30) * 100)))}%",
+                        r.reasoning_paragraph(),
+                        ", ".join(r.mismatched_fields),
+                        r.extra_notes,
+                    ]
+                    for r in results
+                ],
+                columns=[
+                    "Genus",
+                    "Confidence",
+                    "Reasoning",
+                    "Next Step Suggestion",
+                    "Extra Notes",
+                ],
             )
         st.session_state.results = results
 
@@ -171,7 +217,7 @@ def export_pdf(df, user_input):
         pdf.multi_cell(0, 6, f"{row['Genus']} ({row['Confidence']})")
         pdf.multi_cell(0, 6, f"Reasoning: {row['Reasoning']}")
         pdf.multi_cell(0, 6, f"Next Step: {row['Next Step Suggestion']}")
-        if row['Extra Notes']:
+        if row["Extra Notes"]:
             pdf.multi_cell(0, 6, f"Notes: {row['Extra Notes']}")
         pdf.ln(4)
 
@@ -188,7 +234,6 @@ if isinstance(st.session_state.results, pd.DataFrame) and not st.session_state.r
 # --- FOOTER ---
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
-    "<div style='text-align: center; font-size: 14px;'>Created by <b>Zain</b> | Powered by BactAI-d</div>",
+    "<div style='text-align: center; font-size: 14px;'>Created by <b>Zain</b> | Powered by BactAI-D</div>",
     unsafe_allow_html=True
 )
-
