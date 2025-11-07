@@ -7,8 +7,8 @@ from datetime import datetime
 from engine import BacteriaIdentifier
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="BactAI-d Assistant", layout="wide")
-st.title("🧫 BactAI-d — Intelligent Bacterial Identification Assistant")
+st.set_page_config(page_title="BactAI-D Assistant", layout="wide")
+st.title("🧫 BactAI-D — Intelligent Bacterial Identification Assistant")
 
 # --- LOAD DATABASE ---
 @st.cache_data
@@ -225,3 +225,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
