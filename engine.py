@@ -2,7 +2,6 @@ import pandas as pd
 import re
 import random
 
-
 class IdentificationResult:
     def __init__(self, genus, total_score, matched_fields, mismatched_fields, reasoning_factors, extra_notes=""):
         self.genus = genus
@@ -11,23 +10,6 @@ class IdentificationResult:
         self.mismatched_fields = mismatched_fields
         self.reasoning_factors = reasoning_factors
         self.extra_notes = extra_notes
-
-    def confidence_percent(self):
-        """Return a confidence % score based on total matches."""
-        normalized = max(0, min(100, int((self.total_score / 15) * 100)))
-        return normalized
-
-    def confidence_colour(self):
-        """Convert confidence to qualitative color level."""
-        val = self.confidence_percent()
-        if val >= 75:
-            return "🟩 High"
-        elif val >= 50:
-            return "🟨 Moderate"
-        elif val >= 25:
-            return "🟧 Low"
-        else:
-            return "🟥 Very Low"
 
     def reasoning_paragraph(self):
         """Generate a natural-language explanation of why this genus was chosen."""
@@ -53,10 +35,23 @@ class IdentificationResult:
         if "Oxygen Requirement" in self.matched_fields:
             highlights.append(f"which prefers **{self.reasoning_factors.get('Oxygen Requirement', '').lower()}** growth conditions")
 
-        summary = " ".join(highlights)
-        confidence = f"The confidence in this identification is **{self.confidence_colour()}**."
+        if len(highlights) > 1:
+            summary = ", ".join(highlights[:-1]) + " and " + highlights[-1]
+        else:
+            summary = "".join(highlights)
 
-        return f"{intro} {summary}, the isolate most closely resembles **{self.genus}**. {confidence}"
+        confidence = (
+            "The confidence in this identification is high."
+            if self.total_score >= 6 else
+            "The confidence in this identification is moderate."
+        )
+
+        suggestion = ""
+        if self.mismatched_fields:
+            next_test = random.choice(self.mismatched_fields)
+            suggestion = f" To confirm this identification, consider performing or reviewing the **{next_test}** test."
+
+        return f"{intro} {summary}, the isolate most closely resembles **{self.genus}**. {confidence}{suggestion}"
 
 
 class BacteriaIdentifier:
@@ -64,23 +59,27 @@ class BacteriaIdentifier:
         self.db = db.fillna("")
 
     def compare_field(self, db_val, user_val, field_name):
-        """Compare a database field with user input, returning a match score."""
-        if not user_val or str(user_val).strip() == "" or user_val.lower() == "unknown":
-            return 0
+        """Compare one field between database and user input, returning match score."""
+        if not user_val or str(user_val).strip() == "":
+            return 0  # no data provided
 
-        db_val = str(db_val).strip()
-        user_val = str(user_val).strip()
+        db_val = str(db_val).strip().lower()
+        user_val = str(user_val).strip().lower()
 
+        # Hard exclusion fields
         hard_exclusions = ["Gram Stain", "Shape", "Spore Formation"]
 
-        db_options = [x.strip().lower() for x in re.split(r"[;/]", db_val) if x.strip()]
-        user_options = [x.strip().lower() for x in re.split(r"[;/]", user_val) if x.strip()]
+        # Split multi-value fields into options
+        db_options = re.split(r"[;/]", db_val)
+        user_options = re.split(r"[;/]", user_val)
+        db_options = [x.strip() for x in db_options if x.strip()]
+        user_options = [x.strip() for x in user_options if x.strip()]
 
-        # If either is variable, skip exclusion
+        # Variable logic
         if "variable" in db_options or "variable" in user_options:
             return 0
 
-        # Temperature special handling
+        # Growth temperature check
         if field_name == "Growth Temperature":
             try:
                 if "//" in db_val:
@@ -90,20 +89,18 @@ class BacteriaIdentifier:
             except:
                 return 0
 
-        # Normal comparison
-        match_found = any(u == d or u in d or d in u for u in user_options for d in db_options)
+        # --- Matching logic: partial overlap counts as match ---
+        match_found = any(u in db_options or any(u in db_opt for db_opt in db_options) for u in user_options)
 
-        # Apply hard exclusion logic
-        if field_name in hard_exclusions:
-            if not match_found and "variable" not in db_options:
-                return -999
-            else:
-                return 1 if match_found else 0
-
-        return 1 if match_found else -1
+        if match_found:
+            return 1
+        else:
+            if field_name in hard_exclusions:
+                return -999  # Hard exclude
+            return -1
 
     def identify(self, user_input):
-        """Main bacterial identification logic."""
+        """Main identification logic."""
         results = []
 
         for _, row in self.db.iterrows():
@@ -124,7 +121,7 @@ class BacteriaIdentifier:
 
                 if score == -999:
                     total_score = -999
-                    break
+                    break  # Hard exclusion stops consideration
                 elif score == 1:
                     total_score += 1
                     matched_fields.append(field)
@@ -135,44 +132,10 @@ class BacteriaIdentifier:
 
             if total_score > -999:
                 extra_notes = row.get("Extra Notes", "")
-                result = IdentificationResult(
-                    genus, total_score, matched_fields, mismatched_fields, reasoning_factors, extra_notes
+                results.append(
+                    IdentificationResult(genus, total_score, matched_fields, mismatched_fields, reasoning_factors, extra_notes)
                 )
-                results.append(result)
 
-        # Sort descending by total score
+        # Sort by total score descending
         results.sort(key=lambda x: x.total_score, reverse=True)
-
-        # --- Smart Next Step Suggestion ---
-        if results:
-            top_genera = [r.genus for r in results[:10]]
-            unknown_fields = [f for f, v in user_input.items() if v.lower() == "unknown" or v.strip() == ""]
-
-            variation_scores = {}
-            for field in unknown_fields:
-                unique_vals = set()
-                for _, row in self.db[self.db["Genus"].isin(top_genera)].iterrows():
-                    unique_vals.update(re.split(r"[;/]", str(row.get(field, "")).strip().lower()))
-                variation_scores[field] = len(unique_vals)
-
-            best_field = max(variation_scores, key=variation_scores.get) if variation_scores else None
-        else:
-            best_field = None
-
-        # --- Final structured results ---
-        data = []
-        for r in results[:10]:
-            suggestion = (
-                f"Perform **{best_field}** to help confirm between likely options."
-                if best_field else "All key differentiators have been tested."
-            )
-            data.append({
-                "Genus": r.genus,
-                "Confidence (%)": r.confidence_percent(),
-                "Confidence Level": r.confidence_colour(),
-                "Reasoning": r.reasoning_paragraph(),
-                "Next Step Suggestion": suggestion,
-                "Extra Notes": r.extra_notes
-            })
-
-        return pd.DataFrame(data)
+        return results[:10]
