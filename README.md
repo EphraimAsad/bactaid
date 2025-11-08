@@ -1,11 +1,11 @@
 🧫 BacAI-D
-- An intelligent, data-driven bacterial identification and reasoning system
+An intelligent, data-driven bacterial identification and reasoning system
 
 
 💡 Overview
-- BacAI-D is a hybrid expert + machine learning system designed to assist microbiologists in phenotypic bacterial identification and diagnostic reasoning.
-- It operates on a structured knowledge base of >150 bacterial and fungal genera, each defined by standardized biochemical, morphological, and physiological characteristics.
-- Rather than returning a simple “closest match,” BacAI-D explains why certain genera fit the input pattern and which additional tests would best resolve uncertainty — effectively acting as a virtual differential-diagnosis assistant for the microbiology bench.
+BacAI-D is a hybrid expert + machine learning system designed to assist microbiologists in phenotypic bacterial identification and diagnostic reasoning.
+It operates on a structured knowledge base of >150 bacterial and fungal genera, each defined by standardized biochemical, morphological, and physiological characteristics.
+Rather than returning a simple “closest match,” BacAI-D explains why certain genera fit the input pattern and which additional tests would best resolve uncertainty — effectively acting as a virtual differential-diagnosis assistant for the microbiology bench.
 
 
 🔬 Features
