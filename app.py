@@ -9,16 +9,30 @@ from engine import BacteriaIdentifier
 # --- CONFIG ---
 st.set_page_config(page_title="BactAI-D Assistant", layout="wide")
 
-# --- LOAD DATA ---
+# --- LOAD DATA with auto-reload when the file changes ---
 @st.cache_data
-def load_data():
-    data_path = os.path.join("bacteria_db.xlsx")
-    df = pd.read_excel(data_path)
+def load_data(path, last_modified):
+    df = pd.read_excel(path)
     df.columns = [c.strip() for c in df.columns]
     return df
 
-db = load_data()
+# Resolve path (prefer ./data/bacteria_db.xlsx, fallback to ./bacteria_db.xlsx)
+primary_path = os.path.join("data", "bacteria_db.xlsx")
+fallback_path = os.path.join("bacteria_db.xlsx")
+data_path = primary_path if os.path.exists(primary_path) else fallback_path
+
+# Get last modified time (used as cache key so cache invalidates on change)
+try:
+    last_modified = os.path.getmtime(data_path)
+except FileNotFoundError:
+    st.error(f"Database file not found at '{primary_path}' or '{fallback_path}'.")
+    st.stop()
+
+db = load_data(data_path, last_modified)
 eng = BacteriaIdentifier(db)
+
+# Optional: show when the DB was last updated
+st.sidebar.caption(f"📅 Database last updated: {datetime.fromtimestamp(last_modified).strftime('%Y-%m-%d %H:%M:%S')}")
 
 # --- PAGE HEADER ---
 st.title("🧫 BactAI-D: Intelligent Bacteria Identification Assistant")
@@ -199,9 +213,3 @@ if not st.session_state.results.empty:
 # --- FOOTER ---
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | www.linkedin.com/in/zain-asad-1998EPH</div>", unsafe_allow_html=True)
-
-
-
-
-
-
