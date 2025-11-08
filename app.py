@@ -42,7 +42,7 @@ st.markdown("Use the sidebar to input your biochemical and morphological results
 MORPH_FIELDS = ["Gram Stain", "Shape", "Colony Morphology", "Media Grown On", "Motility", "Capsule", "Spore Formation"]
 ENZYME_FIELDS = ["Catalase", "Oxidase", "Coagulase", "Lipase Test"]
 SUGAR_FIELDS = [
-    "Glucose Fermantation", "Lactose Fermentation", "Sucrose Fermentation", "Maltose Fermentation",
+    "Glucose Fermentation", "Lactose Fermentation", "Sucrose Fermentation", "Maltose Fermentation",
     "Mannitol Fermentation", "Sorbitol Fermentation", "Xylose Fermentation", "Rhamnose Fermentation",
     "Arabinose Fermentation", "Raffinose Fermentation", "Trehalose Fermentation", "Inositol Fermentation"
 ]
@@ -213,3 +213,4 @@ if not st.session_state.results.empty:
 # --- FOOTER ---
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown("<div style='text-align:center; font-size:14px;'>Created by <b>Zain</b> | www.linkedin.com/in/zain-asad-1998EPH</div>", unsafe_allow_html=True)
+
