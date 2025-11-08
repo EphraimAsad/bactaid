@@ -1,5 +1,5 @@
 🧫 BacAI-D
-An intelligent, data-driven bacterial identification and reasoning system
+- An intelligent, data-driven bacterial identification and reasoning system
 
 
 💡 Overview
@@ -9,6 +9,7 @@ An intelligent, data-driven bacterial identification and reasoning system
 
 
 🔬 Features
+
 🧠AI-assisted reasoning engine that aligns unknown isolates with probable genera based on phenotype.
 
 🧩 Automated “next test” recommendations to narrow differential results efficiently.
